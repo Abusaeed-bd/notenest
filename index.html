@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NoteNest — Smart Notes</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --bg:#f6f7f9; --panel:#ffffff; --panel-2:#f0f2f5; --border:#e3e6ea;
@@ -341,6 +342,11 @@
   <div class="set-row"><div><div class="lab">🔒 App Lock</div><div class="sub">অ্যাপ খুললে পাসকোড লাগবে</div></div><div class="toggle" id="appLockToggle"></div></div>
   <div class="set-row"><div><div class="lab">📝 Note Lock</div><div class="sub">আলাদা নোট লক করার পাসওয়ার্ড</div></div><div class="toggle" id="noteLockToggle"></div></div>
   <div class="set-row"><div><div class="lab">🔔 রিমাইন্ডার নোটিফিকেশন</div><div class="sub">ব্রাউজার পারমিশন</div></div><button class="btn-sel" id="notifBtn">চালু করুন</button></div>
+  <div style="border-top:1px solid var(--border);margin:16px 0 4px"></div>
+  <label>☁ Google Drive Sync</label>
+  <input id="driveCid" placeholder="Client ID (…apps.googleusercontent.com)" autocomplete="off">
+  <div class="set-row"><div><div class="lab" id="driveStatus">সংযুক্ত নয়</div><div class="sub" id="driveSub">সব ডিভাইসে নোট সিঙ্ক করুন</div></div><button class="btn-sel" id="driveBtn">Connect</button></div>
+  <button class="btn-sel" id="syncNow" style="width:100%;margin-top:4px">🔄 এখন সিঙ্ক করুন</button>
   <div class="modal-actions"><button class="btn-primary" id="setClose">বন্ধ</button></div>
 </div></div>
 
@@ -383,7 +389,7 @@ let saveTimer=null,nbEditing=null,confirmCb=null,pendingSwatch=COLORS[0],recog=n
 function load(){
   try{const r=localStorage.getItem(KEY);if(r)store=JSON.parse(r);}catch(e){}
   store.notebooks=store.notebooks||[];store.notes=store.notes||[];
-  store.settings=Object.assign({theme:"light",font:"",fontSize:15,appLock:"",noteLock:""},store.settings||{});
+  store.settings=Object.assign({theme:"light",font:"",fontSize:15,appLock:"",noteLock:"",driveClientId:"",lastSync:0},store.settings||{});
   if(!store.notebooks.length){
     store.notebooks.push({id:uid(),name:"Personal",color:"#5b6cff",parent:null});
     store.notebooks.push({id:uid(),name:"Work",color:"#2fbf71",parent:null});
@@ -395,7 +401,13 @@ function load(){
   store.notes.forEach(n=>{n.attachments=n.attachments||[];if(n.color===undefined)n.color="";if(n.locked===undefined)n.locked=false;if(n.remindAt===undefined)n.remindAt=null;});
   store.notebooks.forEach(nb=>{if(nb.parent===undefined)nb.parent=null;});
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){toast("⚠ স্টোরেজ পূর্ণ — কিছু ছবি সরান");}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){toast("⚠ স্টোরেজ পূর্ণ — কিছু ছবি সরান");}schedulePush();}
+function normalizeStore(){
+  store.notebooks=store.notebooks||[];store.notes=store.notes||[];
+  store.settings=Object.assign({theme:"light",font:"",fontSize:15,appLock:"",noteLock:"",driveClientId:"",lastSync:0},store.settings||{});
+  store.notes.forEach(n=>{n.attachments=n.attachments||[];if(n.color===undefined)n.color="";if(n.locked===undefined)n.locked=false;if(n.remindAt===undefined)n.remindAt=null;if(n.tags===undefined)n.tags=[];});
+  store.notebooks.forEach(nb=>{if(nb.parent===undefined)nb.parent=null;});
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 
 /* ---------- markdown ---------- */
@@ -736,6 +748,8 @@ function openSettings(){
   document.getElementById("appLockToggle").classList.toggle("on",!!store.settings.appLock);
   document.getElementById("noteLockToggle").classList.toggle("on",!!store.settings.noteLock);
   document.getElementById("notifBtn").textContent=(window.Notification&&Notification.permission==="granted")?"✓ চালু":"চালু করুন";
+  const dc=document.getElementById("driveCid");if(dc)dc.value=store.settings.driveClientId||"";
+  if(typeof updateDriveStatus==="function")updateDriveStatus();
   document.getElementById("setModal").classList.add("show");
 }
 document.getElementById("setBtn").onclick=openSettings;
@@ -789,8 +803,90 @@ document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="n"){
 /* auto-purge trash >30 days */
 function purgeTrash(){const cut=Date.now()-30*864e5;const before=store.notes.length;store.notes=store.notes.filter(n=>!(n.trashed&&n.deletedAt&&n.deletedAt<cut));if(store.notes.length!==before)save();}
 
+/* ---------- Google Drive sync ---------- */
+const drive={token:null,exp:0,fileId:null,connected:false,busy:false};
+const DRIVE_SCOPE="https://www.googleapis.com/auth/drive.appdata";
+const DRIVE_FILE="notenest-sync.json";
+let pushTimer=null;
+function schedulePush(){if(!drive.connected)return;clearTimeout(pushTimer);pushTimer=setTimeout(()=>drivePush(),5000);}
+function driveFetch(url,opt){opt=opt||{};opt.headers=Object.assign({Authorization:"Bearer "+drive.token},opt.headers||{});return fetch(url,opt);}
+function driveReady(){return window.google&&google.accounts&&google.accounts.oauth2;}
+function driveAuth(interactive){
+  return new Promise(res=>{
+    if(!store.settings.driveClientId){toast("আগে Client ID দিন");return res(null);}
+    if(!driveReady()){toast("Google এখনো লোড হয়নি, একটু পর চেষ্টা করুন");return res(null);}
+    if(drive.token&&drive.exp>Date.now()+60000)return res(drive.token);
+    try{
+      const tc=google.accounts.oauth2.initTokenClient({
+        client_id:store.settings.driveClientId,scope:DRIVE_SCOPE,
+        callback:r=>{if(r&&r.access_token){drive.token=r.access_token;drive.exp=Date.now()+((r.expires_in||3600)*1000);drive.connected=true;res(r.access_token);}else res(null);},
+        error_callback:()=>res(null)
+      });
+      tc.requestAccessToken({prompt:interactive?"consent":""});
+    }catch(e){res(null);}
+  });
+}
+function mergeStores(remote){
+  const map={};store.notes.forEach(n=>map[n.id]=n);
+  (remote.notes||[]).forEach(rn=>{const ln=map[rn.id];if(!ln||(rn.updated||0)>(ln.updated||0))map[rn.id]=rn;});
+  store.notes=Object.values(map);
+  const nb={};(remote.notebooks||[]).forEach(x=>nb[x.id]=x);store.notebooks.forEach(x=>nb[x.id]=x);
+  store.notebooks=Object.values(nb);
+  normalizeStore();
+}
+async function driveSync(interactive){
+  if(drive.busy)return;
+  const tok=await driveAuth(interactive!==false);
+  if(!tok){updateDriveStatus();return;}
+  drive.busy=true;updateDriveStatus("🔄 সিঙ্ক হচ্ছে...");
+  try{
+    if(!drive.fileId){
+      const r=await driveFetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q="+encodeURIComponent("name='"+DRIVE_FILE+"'")+"&fields=files(id)");
+      const j=await r.json();if(j.files&&j.files.length)drive.fileId=j.files[0].id;
+    }
+    if(drive.fileId){
+      const r=await driveFetch("https://www.googleapis.com/drive/v3/files/"+drive.fileId+"?alt=media");
+      if(r.ok){const remote=await r.json();if(remote&&remote.notes)mergeStores(remote);}
+    }
+    normalizeStore();save();
+    const body=JSON.stringify(store);
+    if(drive.fileId){
+      await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+drive.fileId+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body});
+    }else{
+      const b="nnsync"+Date.now();const meta={name:DRIVE_FILE,parents:["appDataFolder"]};
+      const mb="--"+b+"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"+JSON.stringify(meta)+"\r\n--"+b+"\r\nContent-Type: application/json\r\n\r\n"+body+"\r\n--"+b+"--";
+      const r=await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+b},body:mb});
+      const j=await r.json();drive.fileId=j.id;
+    }
+    store.settings.lastSync=Date.now();save();drive.connected=true;
+    state.unlocked.clear();renderAll();updateDriveStatus();if(interactive!==false)toast("☁ সিঙ্ক সম্পন্ন");
+  }catch(e){updateDriveStatus();toast("সিঙ্ক ব্যর্থ — আবার চেষ্টা করুন");}
+  drive.busy=false;
+}
+async function drivePush(){
+  if(!drive.connected||drive.busy||!drive.fileId)return;
+  const tok=await driveAuth(false);if(!tok)return;
+  try{await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+drive.fileId+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(store)});store.settings.lastSync=Date.now();updateDriveStatus();}catch(e){}
+}
+function updateDriveStatus(txt){
+  const s=document.getElementById("driveStatus"),sub=document.getElementById("driveSub"),btn=document.getElementById("driveBtn");
+  if(!s)return;
+  if(txt){s.textContent=txt;return;}
+  if(drive.connected){s.textContent="✓ সংযুক্ত";sub.textContent=store.settings.lastSync?("শেষ সিঙ্ক: "+fmtDT(store.settings.lastSync)):"সিঙ্ক চলছে";btn.textContent="Disconnect";}
+  else{s.textContent="সংযুক্ত নয়";sub.textContent="সব ডিভাইসে নোট সিঙ্ক করুন";btn.textContent="Connect";}
+}
+document.getElementById("driveCid").onchange=e=>{store.settings.driveClientId=e.target.value.trim();save();};
+document.getElementById("driveBtn").onclick=async()=>{
+  if(drive.connected){drive.connected=false;drive.token=null;drive.exp=0;updateDriveStatus();toast("সংযোগ বিচ্ছিন্ন");return;}
+  const cid=document.getElementById("driveCid").value.trim();if(cid){store.settings.driveClientId=cid;save();}
+  await driveSync(true);
+};
+document.getElementById("syncNow").onclick=()=>driveSync(true);
+function driveBootstrap(){let t=0;const iv=setInterval(()=>{if(driveReady()){clearInterval(iv);driveSync(false);}else if(++t>24)clearInterval(iv);},500);}
+
 function renderAll(){renderNav();renderList();renderEditor();}
 load();purgeTrash();applyTheme();renderAll();scheduleReminders();maybeLock();
+if(store.settings.driveClientId)driveBootstrap();
 </script>
 </body>
 </html>
