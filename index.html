@@ -314,6 +314,7 @@ function mdInline(s){
   s=s.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
   s=s.replace(/(^|[^*])\*([^*]+)\*/g,"$1<em>$2</em>");
   s=s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s=s.replace(/\[\[([^\]]+)\]\]/g,'<a class="nlink" style="color:var(--accent);text-decoration:underline" data-nl="$1">$1</a>');
   s=s.replace(/(^|\s)#([^\s#][^\s]*)/g,'$1<span style="color:var(--accent)">#$2</span>');
   return s;
 }
@@ -507,8 +508,64 @@ function renderTags(n){
 }
 function renderAtt(n){
   const box=document.getElementById("eAtt");
-  box.innerHTML=(n.attachments||[]).map((a,i)=>`<div class="a"><img src="${a.data}"><button class="x" data-i="${i}">×</button></div>`).join("");
-  box.querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{n.attachments.splice(+b.dataset.i,1);n.updated=Date.now();save();renderAtt(n);});
+  box.innerHTML=(n.attachments||[]).map((a,i)=>{
+    if(a.type==="audio")return `<div class="a" style="background:var(--card);padding:8px 10px"><div style="display:flex;flex-direction:column;gap:5px;min-width:150px"><div style="font-size:11.5px;color:var(--muted)">🎙 ${esc(a.name||"Audio")}</div><audio controls src="${a.data}" style="width:175px;height:32px"></audio></div><button class="x" data-i="${i}">×</button></div>`;
+    if(a.type==="file")return `<div class="a afopen" data-open="${i}" style="background:var(--card);padding:14px 12px;display:flex;align-items:center;gap:8px;min-width:120px;max-width:170px"><span style="font-size:22px">📄</span><span style="font-size:12px;word-break:break-all">${esc(a.name||"File")}</span><button class="x" data-i="${i}">×</button></div>`;
+    return `<div class="a"><img src="${a.data}"><button class="x" data-i="${i}">×</button></div>`;
+  }).join("");
+  box.querySelectorAll(".x").forEach(b=>b.onclick=e=>{e.stopPropagation();n.attachments.splice(+b.dataset.i,1);n.updated=Date.now();save();renderAtt(n);renderList();});
+  box.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openDataFile(n.attachments[+b.dataset.open]));
+}
+function addAtt(n,a){n.attachments.push(a);n.updated=Date.now();save();renderAtt(n);renderList();}
+function openDataFile(a){try{const w=window.open();if(w){w.document.write('<title>'+esc(a.name||"file")+'</title><iframe src="'+a.data+'" style="position:fixed;inset:0;border:0;width:100%;height:100%"></iframe>');w.document.close();}else toast("Allow pop-ups to open the file");}catch(e){toast("Can't open this file");}}
+function openAttach(n){
+  openSheet(`<div class="grab"></div><h3>Add to note</h3>
+    <div class="srow" id="atPhoto"><span class="ic">🖼</span>Photo</div>
+    <div class="srow" id="atCam"><span class="ic">📷</span>Camera / Scan</div>
+    <div class="srow" id="atAudio"><span class="ic">🎙</span>Record audio</div>
+    <div class="srow" id="atDraw"><span class="ic">✏️</span>Drawing</div>
+    <div class="srow" id="atFile"><span class="ic">📄</span>File / PDF</div>`);
+  const pick=(accept,capture,cb)=>{const i=document.createElement("input");i.type="file";i.accept=accept;if(capture)i.capture=capture;i.multiple=!capture;i.onchange=e=>cb([...e.target.files]);i.click();};
+  document.getElementById("atPhoto").onclick=()=>{closeSheet();pick("image/*",null,fs=>fs.forEach(f=>downscale(f,d=>addAtt(n,{type:"image",name:f.name,data:d}))));};
+  document.getElementById("atCam").onclick=()=>{closeSheet();pick("image/*","environment",fs=>fs.forEach(f=>downscale(f,d=>addAtt(n,{type:"image",name:f.name,data:d}))));};
+  document.getElementById("atFile").onclick=()=>{closeSheet();pick("*/*",null,fs=>fs.forEach(f=>{if(f.size>8*1024*1024){toast(f.name+": too big (max 8MB)");return;}const r=new FileReader();r.onload=()=>addAtt(n,{type:"file",name:f.name,data:r.result});r.readAsDataURL(f);}));};
+  document.getElementById("atAudio").onclick=()=>{closeSheet();openAudioSheet(n);};
+  document.getElementById("atDraw").onclick=()=>{closeSheet();openDrawSheet(n);};
+}
+function openAudioSheet(n){
+  openSheet(`<div class="grab"></div><h3>Record audio</h3><div style="text-align:center;padding:14px 0"><div id="auTime" style="font-size:30px;font-weight:700">0:00</div><div id="auState" style="color:var(--muted);font-size:13px;margin-top:4px">Tap start, speak, then stop</div></div><button class="sbtn" id="auBtn">● Start recording</button>`);
+  let rec=null,chunks=[],t0=0,tick=null,started=false;const btn=document.getElementById("auBtn");
+  btn.onclick=async()=>{
+    if(!started){
+      let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true});}catch(e){toast("Microphone permission needed");return;}
+      try{rec=new MediaRecorder(stream);}catch(e){toast("Recording not supported here");stream.getTracks().forEach(t=>t.stop());return;}
+      chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+      rec.onstop=()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(chunks,{type:rec.mimeType||"audio/webm"});const r=new FileReader();r.onload=()=>{addAtt(n,{type:"audio",name:"Recording "+new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),data:r.result});closeSheet();toast("🎙 Audio added");};r.readAsDataURL(blob);};
+      rec.start();started=true;t0=Date.now();document.getElementById("auState").textContent="Recording…";btn.textContent="■ Stop & save";
+      tick=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);document.getElementById("auTime").textContent=Math.floor(s/60)+":"+String(s%60).padStart(2,"0");},300);
+    }else{clearInterval(tick);btn.textContent="Saving…";try{rec.stop();}catch(e){}}
+  };
+}
+function openDrawSheet(n){
+  openSheet(`<div class="grab"></div><h3>Drawing</h3><div style="padding:0 16px"><canvas id="drw" width="640" height="440" style="width:100%;background:#fff;border-radius:12px;touch-action:none;display:block"></canvas></div><div class="swrow" id="drwCols"></div><div style="display:flex;gap:8px;padding:0 22px"><button class="sbtn sec" id="drwClear" style="margin:8px 0">Clear</button><button class="sbtn" id="drwSave" style="margin:8px 0">Save</button></div>`);
+  const cv=document.getElementById("drw"),ctx=cv.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,cv.width,cv.height);ctx.lineCap="round";ctx.lineJoin="round";ctx.lineWidth=3.5;ctx.strokeStyle="#111";
+  let draw=false,px=0,py=0;
+  const pos=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*(cv.width/r.width),(e.clientY-r.top)*(cv.height/r.height)];};
+  cv.addEventListener("pointerdown",e=>{e.preventDefault();draw=true;[px,py]=pos(e);});
+  cv.addEventListener("pointermove",e=>{if(!draw)return;e.preventDefault();const[x,y]=pos(e);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();px=x;py=y;});
+  window.addEventListener("pointerup",()=>{draw=false;});
+  const cols=["#111111","#f5b301","#e5484d","#0a84ff","#30d158","#bf5af2"];
+  document.getElementById("drwCols").innerHTML=cols.map((c,i)=>`<button data-c="${c}" class="${i===0?"sel":""}" style="background:${c}"></button>`).join("");
+  document.querySelectorAll("#drwCols [data-c]").forEach(b=>b.onclick=()=>{ctx.strokeStyle=b.dataset.c;document.querySelectorAll("#drwCols [data-c]").forEach(x=>x.classList.remove("sel"));b.classList.add("sel");});
+  document.getElementById("drwClear").onclick=()=>{ctx.fillStyle="#fff";ctx.fillRect(0,0,cv.width,cv.height);};
+  document.getElementById("drwSave").onclick=()=>{addAtt(n,{type:"image",name:"Drawing.png",data:cv.toDataURL("image/png")});closeSheet();toast("✏️ Drawing added");};
+}
+function bindNLinks(container){container.querySelectorAll(".nlink").forEach(a=>a.onclick=ev=>{ev.preventDefault();openByTitle(a.dataset.nl);});}
+function openByTitle(title){const t=(title||"").trim().toLowerCase();if(!t)return;let n=store.notes.find(x=>!x.trashed&&noteTitle(x).toLowerCase()===t);if(!n){n={id:uid(),title:title.trim(),body:"",notebook:QUICK,tags:[],pinned:false,trashed:false,color:"",locked:false,remindAt:null,attachments:[],created:Date.now(),updated:Date.now()};store.notes.unshift(n);save();}openNote(n.id);}
+function exportPDF(n){
+  const html='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(noteTitle(n))+'</title><style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;max-width:720px;margin:24px auto;padding:0 20px;line-height:1.65;color:#111}h1{font-size:25px;margin:0 0 14px}img{max-width:100%;border-radius:8px}pre{background:#f4f4f5;padding:12px;border-radius:8px;overflow:auto}code{background:#f0f0f2;padding:2px 5px;border-radius:4px}blockquote{border-left:3px solid #ccc;padding-left:12px;color:#555;margin:10px 0}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 10px}a{color:#0a66c2}</style></head><body><h1>'+esc(noteTitle(n))+'</h1>'+renderMD(n.body)+'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},250);}</scr'+'ipt></body></html>';
+  const w=window.open("","_blank");if(!w){toast("Allow pop-ups to export PDF");return;}
+  w.document.open();w.document.write(html);w.document.close();
 }
 function updWords(){const t=document.getElementById("eBody").value;const w=t.trim()?t.trim().split(/\s+/).length:0;document.getElementById("eWords").textContent=w+" words · "+t.length+" chars";}
 let edSaveTimer=null;
@@ -516,7 +573,7 @@ function edChanged(){const n=activeNote();if(!n)return;n.title=document.getEleme
 document.getElementById("eTitle").addEventListener("input",edChanged);
 document.getElementById("eBody").addEventListener("input",()=>{const n=activeNote();edChanged();if(n)renderTags(n);});
 document.getElementById("eBack").onclick=()=>{save();back();};
-document.getElementById("ePreview").onclick=()=>{edPreview=!edPreview;const b=document.getElementById("eBody"),p=document.getElementById("ePrev");document.getElementById("ePreview").classList.toggle("on",edPreview);if(edPreview){p.innerHTML=renderMD(b.value);p.style.display="block";b.style.display="none";}else{p.style.display="none";b.style.display="block";}};
+document.getElementById("ePreview").onclick=()=>{edPreview=!edPreview;const b=document.getElementById("eBody"),p=document.getElementById("ePrev");document.getElementById("ePreview").classList.toggle("on",edPreview);if(edPreview){p.innerHTML=renderMD(b.value);bindNLinks(p);p.style.display="block";b.style.display="none";}else{p.style.display="none";b.style.display="block";}};
 
 document.getElementById("eTool").addEventListener("click",e=>{
   const b=e.target.closest("[data-md]");if(!b)return;const ta=document.getElementById("eBody");const s=ta.selectionStart,en=ta.selectionEnd,txt=ta.value,sel=txt.slice(s,en);
@@ -539,7 +596,7 @@ document.getElementById("eVoice").onclick=()=>{const n=activeNote();if(!n)return
   recog.start();recording=true;document.getElementById("eVoice").classList.add("rec");toast("🎤 Listening… tap mic to stop");
 };
 /* image (with downscale) */
-document.getElementById("eImg").onclick=()=>document.getElementById("eImgFile").click();
+document.getElementById("eImg").onclick=()=>{const n=activeNote();if(n)openAttach(n);};
 document.getElementById("eImgFile").onchange=e=>{const n=activeNote();if(!n)return;[...e.target.files].forEach(f=>downscale(f,data=>{n.attachments.push({type:"image",name:f.name,data});n.updated=Date.now();save();renderAtt(n);}));e.target.value="";};
 function downscale(file,cb){const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const max=1600;let{width:w,height:h}=img;if(w>max||h>max){const s=Math.min(max/w,max/h);w=Math.round(w*s);h=Math.round(h*s);}const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);try{cb(c.toDataURL("image/jpeg",0.82));}catch(err){cb(r.result);}};img.onerror=()=>cb(r.result);img.src=r.result;};r.readAsDataURL(file);}
 
@@ -551,6 +608,7 @@ document.getElementById("eMenu").onclick=()=>{const n=activeNote();if(!n)return;
     {ic:"⏰",label:n.remindAt?"Edit reminder":"Add reminder",fn:()=>openReminderSheet(n)},
     {ic:n.locked?"🔓":"🔒",label:n.locked?"Unlock note":"Lock note",fn:()=>toggleLock(n)},
     {ic:"⬇",label:"Export (.md)",fn:()=>exportNotes([n])},
+    {ic:"📄",label:"Export as PDF",fn:()=>exportPDF(n)},
     {ic:"🗑",label:n.trashed?"Delete permanently":"Move to Trash",danger:true,fn:()=>{if(n.trashed){store.notes=store.notes.filter(x=>x.id!==n.id);state.activeId=null;save();back();toast("Deleted");}else{n.trashed=true;n.pinned=false;n.deletedAt=Date.now();save();state.activeId=null;back();toast("Moved to Trash");}}}
   ];
   openSheet(`<div class="grab"></div><h3>${esc(noteTitle(n))}</h3>`+opts.map((o,i)=>`<div class="srow ${o.danger?"danger":""}" data-i="${i}"><span class="ic">${o.ic}</span>${o.label}</div>`).join(""));
@@ -606,6 +664,7 @@ function renderSettings(){
     ${row("💾","Backup & Restore",undefined,"backup","#0a84ff")}
     ${row("📊","Storage",(sz/1024/1024).toFixed(2)+" MB","storage","#64d2ff")}
   </div>`;
+  h+=`<div class="sec-label">Import</div><div class="group">${row("📥","Import from Google Keep",undefined,"keep","#fbbc04")}</div>`;
   h+=`<div class="sec-label">Privacy</div><div class="group">
     ${toggleRow("🔐","App Lock","Passcode to open the app",!!s.appLock,"applock","#0a84ff")}
     ${toggleRow("🔒","Note Lock","Password to open locked notes",!!s.noteLock,"notelock","#bf5af2")}
@@ -627,6 +686,7 @@ function settingsAction(k){
   else if(k==="backup")openBackupSheet();
   else if(k==="storage")openStorageSheet();
   else if(k==="notif"){if(window.Notification)Notification.requestPermission().then(()=>renderSettings());}
+  else if(k==="keep")openKeepImport();
 }
 function settingsToggle(k){
   const s=store.settings;
@@ -649,6 +709,54 @@ function openBackupSheet(){
   document.getElementById("bExport").onclick=()=>{closeSheet();doDownload("notenest-backup-"+new Date().toISOString().slice(0,10)+".json",JSON.stringify(store,null,2),"application/json");};
   document.getElementById("bImport").onclick=()=>document.getElementById("bFile").click();
   document.getElementById("bFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.notes&&d.notebooks){store=d;normalizeStore();save();closeSheet();state.activeId=null;applyTheme();showScreen("folders",false);scheduleReminders();toast("Imported");}else toast("Not a valid backup");}catch(err){toast("Could not read file");}};r.readAsText(f);};
+}
+/* ---- Google Keep import (via Takeout) ---- */
+function loadJSZip(){return new Promise((res,rej)=>{if(window.JSZip)return res(window.JSZip);const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=()=>window.JSZip?res(window.JSZip):rej();s.onerror=()=>rej();document.head.appendChild(s);});}
+function mimeOf(p){p=p.toLowerCase();if(p.endsWith(".png"))return"image/png";if(p.endsWith(".gif"))return"image/gif";if(p.endsWith(".webp"))return"image/webp";return"image/jpeg";}
+function keepFolderId(){let f=store.notebooks.find(nb=>!nb.special&&nb.name==="Google Keep");if(!f){f={id:uid(),name:"Google Keep",color:"#fbbc04",parent:null};store.notebooks.push(f);}return f.id;}
+function keepToNote(j,images){
+  let body=j.textContent||"";
+  if(j.listContent&&j.listContent.length)body=j.listContent.map(it=>"- ["+(it.isChecked?"x":" ")+"] "+(it.text||"")).join("\n");
+  if(j.annotations)j.annotations.forEach(a=>{if(a.url)body+="\n\n["+(a.title||a.url)+"]("+a.url+")";});
+  const tags=(j.labels||[]).map(l=>l.name).filter(Boolean);
+  const atts=[];(j.attachments||[]).forEach(a=>{const nm=(a.filePath||"").split("/").pop();if(nm&&images[nm])atts.push({type:"image",name:nm,data:images[nm]});});
+  const CM={RED:"#2a1a1a",ORANGE:"#2d2416",YELLOW:"#2a2410",GREEN:"#1f2d1a",TEAL:"#1a2432",BLUE:"#1a2432",DARKBLUE:"#1a2432",CERULEAN:"#1a2432",PURPLE:"#241a2d",PINK:"#2a1a1a",BROWN:"#2d2416",GRAY:""};
+  const upd=j.userEditedTimestampUsec?Math.round(j.userEditedTimestampUsec/1000):Date.now();
+  const crt=j.createdTimestampUsec?Math.round(j.createdTimestampUsec/1000):upd;
+  return {id:uid(),title:j.title||"",body,tags,pinned:!!j.isPinned,trashed:!!j.isTrashed,color:CM[j.color]||"",locked:false,remindAt:null,attachments:atts,created:crt,updated:upd};
+}
+function finishKeepImport(notes){
+  if(!notes.length){toast("No Keep notes found in that file");return;}
+  const fid=keepFolderId();notes.forEach(n=>{n.notebook=fid;store.notes.push(n);});
+  save();scheduleReminders();closeSheet();showScreen("folders",false);toast("Imported "+notes.length+" notes from Keep");
+}
+async function importKeepZip(file){
+  const st=document.getElementById("kStatus");const set=m=>{if(st)st.textContent=m;};
+  set("Loading unzip tool…");
+  let JSZip;try{JSZip=await loadJSZip();}catch(e){set("");toast("Couldn't load unzip tool (check internet)");return;}
+  set("Reading ZIP…");
+  let zip;try{zip=await JSZip.loadAsync(file);}catch(e){set("");toast("Not a valid ZIP file");return;}
+  const paths=Object.keys(zip.files);const images={};
+  for(const p of paths){if(/\.(png|jpe?g|gif|webp)$/i.test(p)){try{const b=await zip.files[p].async("base64");images[p.split("/").pop()]="data:"+mimeOf(p)+";base64,"+b;}catch(e){}}}
+  let notes=[];
+  for(const p of paths){if(/\.json$/i.test(p)&&/keep/i.test(p)){try{const j=JSON.parse(await zip.files[p].async("string"));if(j&&(j.textContent!==undefined||j.listContent||j.title!==undefined))notes.push(keepToNote(j,images));}catch(e){}}}
+  if(!notes.length){for(const p of paths){if(/\.json$/i.test(p)){try{const j=JSON.parse(await zip.files[p].async("string"));if(j&&(j.textContent!==undefined||j.listContent)&&(j.isPinned!==undefined||j.color!==undefined||j.userEditedTimestampUsec!==undefined))notes.push(keepToNote(j,images));}catch(e){}}}}
+  finishKeepImport(notes);
+}
+async function importKeepJson(files){const notes=[];for(const f of files){try{const j=JSON.parse(await f.text());notes.push(keepToNote(j,{}));}catch(e){}}finishKeepImport(notes);}
+function openKeepImport(){
+  openSheet(`<div class="grab"></div><h3>Import from Google Keep</h3>
+    <div style="padding:2px 22px 10px;font-size:13.5px;color:var(--muted);line-height:1.6">
+      1. Open <b>takeout.google.com</b><br>2. Click <b>Deselect all</b>, then tick only <b>Keep</b><br>3. Export and download the <b>.zip</b><br>4. Upload that ZIP below — notes, checklists, labels, colors &amp; images all come in</div>
+    <button class="sbtn" id="kZip">📦 Upload Takeout .zip</button>
+    <button class="sbtn sec" id="kJson">Pick .json files instead</button>
+    <div id="kStatus" style="padding:10px 22px 0;font-size:13px;color:var(--accent)"></div>
+    <input type="file" id="kZipFile" accept=".zip,application/zip" hidden>
+    <input type="file" id="kJsonFile" accept=".json,application/json" multiple hidden>`);
+  document.getElementById("kZip").onclick=()=>document.getElementById("kZipFile").click();
+  document.getElementById("kJson").onclick=()=>document.getElementById("kJsonFile").click();
+  document.getElementById("kZipFile").onchange=e=>{const f=e.target.files[0];if(f)importKeepZip(f);};
+  document.getElementById("kJsonFile").onchange=e=>importKeepJson([...e.target.files]);
 }
 function openStorageSheet(){
   const sz=new Blob([JSON.stringify(store)]).size;const imgs=store.notes.reduce((a,n)=>a+(n.attachments||[]).length,0);
