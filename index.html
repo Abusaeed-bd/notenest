@@ -1,373 +1,264 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>NoteNest — Smart Notes</title>
+<meta name="theme-color" content="#f5b301">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NoteNest">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
-    --bg:#f6f7f9; --panel:#ffffff; --panel-2:#f0f2f5; --border:#e3e6ea;
-    --text:#1b1f24; --muted:#6b7482; --accent:#5b6cff; --accent-soft:#eceeff;
-    --danger:#e5484d; --shadow:0 1px 3px rgba(20,24,40,.08),0 8px 24px rgba(20,24,40,.06);
-    --radius:14px; --fs:15px; --ff:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Bengali",sans-serif;
+    --bg:#000000; --card:#1c1c1e; --card2:#2c2c2e; --sep:rgba(255,255,255,.09);
+    --text:#ffffff; --muted:#8e8e93; --muted2:#5c5c61; --accent:#f5b301; --accent2:#ffcb45;
+    --danger:#ff453a; --green:#30d158; --blue:#0a84ff;
+    --ff:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Bengali",sans-serif;
+    --fs:16px; --radius:16px; --toppad:env(safe-area-inset-top,0px); --botpad:env(safe-area-inset-bottom,0px);
   }
-  [data-theme="dark"]{
-    --bg:#0f1115; --panel:#171a21; --panel-2:#1e222b; --border:#2a2f3a;
-    --text:#e8eaed; --muted:#8b93a1; --accent:#7c8aff; --accent-soft:#232842;
-    --danger:#ff6b6f; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  [data-theme="light"]{
+    --bg:#f2f2f7; --card:#ffffff; --card2:#f2f2f7; --sep:rgba(0,0,0,.08);
+    --text:#000000; --muted:#8a8a8e; --muted2:#b0b0b5; --accent:#e0a000; --accent2:#f5b301;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
-  body{font-family:var(--ff);background:var(--bg);color:var(--text);font-size:var(--fs);-webkit-font-smoothing:antialiased;overflow:hidden}
+  body{font-family:var(--ff);background:#0a0a0a;color:var(--text);font-size:var(--fs);-webkit-font-smoothing:antialiased;overflow:hidden}
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
   input,textarea,select{font-family:inherit;color:inherit}
-  ::-webkit-scrollbar{width:9px;height:9px}
-  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px}
+  ::-webkit-scrollbar{width:0;height:0}
 
-  .app{display:grid;grid-template-columns:240px 320px 1fr;height:100vh;height:100dvh}
+  #app{max-width:440px;margin:0 auto;height:100dvh;position:relative;overflow:hidden;background:var(--bg)}
+  @media(min-width:470px){
+    body{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 0%,#18181b,#060606)}
+    #app{height:min(100dvh,920px);border-radius:30px;box-shadow:0 24px 70px rgba(0,0,0,.6);border:1px solid #2a2a2e;overflow:hidden}
+  }
 
-  .sidebar{background:var(--panel-2);border-right:1px solid var(--border);display:flex;flex-direction:column;min-width:0}
-  .brand{display:flex;align-items:center;gap:9px;padding:16px 16px 10px;font-weight:700;font-size:17px}
-  .brand .dot{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#9aa6ff);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
-  .nav{padding:6px 8px;overflow-y:auto;flex:1;min-height:0}
-  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;color:var(--text);width:100%;text-align:left;font-size:14px;margin-bottom:2px;transition:background .12s}
-  .nav-item .ic{width:17px;text-align:center;opacity:.8;font-size:14px}
-  .nav-item .count{margin-left:auto;font-size:12px;color:var(--muted);background:var(--panel);padding:1px 7px;border-radius:20px}
-  .nav-item:hover{background:var(--panel)}
-  .nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
-  .nav-item.active .count{color:var(--accent)}
-  .nav-label{padding:14px 13px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;display:flex;justify-content:space-between;align-items:center}
-  .nav-label button{color:var(--muted);font-size:16px;line-height:1;padding:2px 4px;border-radius:5px}
-  .nav-label button:hover{background:var(--panel);color:var(--accent)}
-  .nb-row{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:9px;font-size:14px;width:100%;text-align:left;margin-bottom:2px}
-  .nb-row:hover{background:var(--panel)}
-  .nb-row:hover .nb-edit{opacity:.7}
-  .nb-row.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
-  .nb-row .swatch{width:10px;height:10px;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
-  .nb-row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-  .nb-row .count{font-size:12px;color:var(--muted)}
-  .nb-row .nb-edit{opacity:0;font-size:12px;color:var(--muted);padding:0 2px}
-  .nb-row .nb-edit:hover{color:var(--accent)}
-  .tag-chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;padding:4px 9px;border-radius:20px;background:var(--panel);margin:3px;color:var(--muted)}
-  .tag-chip:hover{color:var(--accent)}
-  .tag-chip.active{background:var(--accent);color:#fff}
-  .foot{padding:10px;border-top:1px solid var(--border);display:flex;gap:6px}
-  .foot button{flex:1;padding:8px 4px;border-radius:8px;font-size:12px;color:var(--muted);background:var(--panel);display:flex;align-items:center;justify-content:center;gap:4px}
-  .foot button:hover{color:var(--accent)}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg)}
+  .screen.show{display:flex}
+  .screen.anim{animation:slideIn .26s cubic-bezier(.3,.7,.3,1)}
+  @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
 
-  .list{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;min-width:0}
-  .list-head{padding:14px 16px 10px;border-bottom:1px solid var(--border)}
-  .list-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
-  .list-title h2{font-size:17px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .head-btns{display:flex;gap:6px}
-  .btn-new{background:var(--accent);color:#fff;padding:8px 13px;border-radius:9px;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:6px;box-shadow:var(--shadow)}
-  .btn-new:hover{filter:brightness(1.07)}
-  .btn-sel{background:var(--panel-2);color:var(--muted);padding:8px 11px;border-radius:9px;font-size:13px}
-  .btn-sel:hover{color:var(--text)}
-  .search{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 11px}
-  .search input{flex:1;border:none;background:none;outline:none;font-size:14px}
-  .search .ic{color:var(--muted)}
-  .sort{display:flex;gap:4px;margin-top:9px}
-  .sort button{font-size:12px;color:var(--muted);padding:4px 9px;border-radius:7px}
-  .sort button.active{background:var(--panel-2);color:var(--text);font-weight:600}
-  .notes{overflow-y:auto;flex:1;padding:6px}
-  .note-card{padding:12px 13px;border-radius:11px;margin-bottom:3px;border:1px solid transparent;position:relative;display:flex;gap:10px;align-items:flex-start}
-  .note-card:hover{background:var(--panel-2)}
-  .note-card.active{background:var(--accent-soft)}
-  .nc-check{width:19px;height:19px;border-radius:6px;border:2px solid var(--border);flex-shrink:0;margin-top:2px;display:none;align-items:center;justify-content:center;font-size:12px;color:#fff}
+  .sc-head{padding:calc(var(--toppad) + 14px) 20px 8px;position:relative}
+  .sc-head .hactions{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-height:34px}
+  .sc-head h1{font-size:34px;font-weight:800;letter-spacing:-.5px;margin-top:4px}
+  .hbtn{width:34px;height:34px;border-radius:50%;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--accent)}
+  .hbtn.pill{width:auto;padding:0 16px;border-radius:17px;font-size:15px;font-weight:500}
+  .hbtn.back{background:transparent;font-size:26px;width:30px}
+  .hbtn.plain{background:transparent}
+  .sc-body{flex:1;overflow-y:auto;padding-bottom:20px}
+  .sc-bottom{padding:10px 16px calc(var(--botpad) + 12px);display:flex;align-items:center;gap:12px;background:linear-gradient(to top,var(--bg) 60%,transparent)}
+  .searchbar{flex:1;display:flex;align-items:center;gap:8px;background:var(--card2);border-radius:12px;padding:10px 13px;color:var(--muted)}
+  .searchbar input{flex:1;border:none;background:none;outline:none;font-size:16px;color:var(--text)}
+  .fab{width:52px;height:52px;border-radius:50%;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 6px 18px rgba(245,179,1,.4);flex-shrink:0}
+  .fab:active{transform:scale(.94)}
+
+  .group{background:var(--card);border-radius:var(--radius);overflow:hidden;margin:0 16px 20px}
+  .sec-label{padding:16px 22px 7px;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between}
+  .row{display:flex;align-items:center;gap:14px;padding:14px 16px;position:relative}
+  .row+.row::before{content:"";position:absolute;top:0;left:56px;right:0;height:1px;background:var(--sep)}
+  .row:active{background:var(--card2)}
+  .row .ricon{width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  .row .ricon.sq{border-radius:8px;font-size:16px}
+  .row .rname{flex:1;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .rval{color:var(--muted);font-size:16px}
+  .row .chev{color:var(--muted2);font-size:16px;margin-left:2px}
+  .row.big{padding:16px}
+  .row.big .ricon{width:34px;height:34px;border-radius:9px;font-size:18px}
+
+  /* note cards in list */
+  .notecard{padding:13px 16px;position:relative;display:flex;gap:12px;align-items:flex-start}
+  .notecard+.notecard::before{content:"";position:absolute;top:0;left:16px;right:16px;height:1px;background:var(--sep)}
+  .notecard:active{background:var(--card2)}
+  .nc-check{width:22px;height:22px;border-radius:50%;border:2px solid var(--muted2);flex-shrink:0;margin-top:2px;display:none;align-items:center;justify-content:center;font-size:13px;color:#000}
   .selmode .nc-check{display:flex}
   .nc-check.on{background:var(--accent);border-color:var(--accent)}
-  .nc-body{flex:1;min-width:0}
-  .nc-top{display:flex;align-items:center;gap:7px;margin-bottom:3px}
-  .nc-top .pin{color:var(--accent);font-size:12px}
-  .nc-title{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-  .nc-preview{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45;min-height:1.2em}
-  .nc-meta{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
-  .nc-meta .dot{width:7px;height:7px;border-radius:2px}
-  .nc-meta .chip{display:inline-flex;align-items:center;gap:3px}
-  .nc-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
-  .nc-tags span{font-size:11px;background:var(--panel);padding:1px 7px;border-radius:12px;color:var(--muted)}
-  .empty{padding:50px 24px;text-align:center;color:var(--muted);font-size:13.5px}
-  .empty .big{font-size:38px;margin-bottom:10px;opacity:.5}
+  .nc-main{flex:1;min-width:0}
+  .nc-title{font-size:16.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+  .nc-title .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .nc-sub{font-size:14px;color:var(--muted);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4}
+  .nc-meta{display:flex;gap:9px;align-items:center;margin-top:6px;font-size:12px;color:var(--muted2);flex-wrap:wrap}
+  .nc-meta .mchip{display:inline-flex;align-items:center;gap:4px}
+  .nc-thumb{width:52px;height:52px;border-radius:9px;object-fit:cover;flex-shrink:0}
+  .empty{text-align:center;color:var(--muted);padding:70px 30px;font-size:15px}
+  .empty .big{font-size:44px;opacity:.4;margin-bottom:12px}
 
-  .editor{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
-  .ed-bar{display:flex;align-items:center;gap:4px;padding:11px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex-wrap:wrap}
-  .ed-bar .spacer{flex:1}
-  .icon-btn{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:16px}
-  .icon-btn:hover{background:var(--panel-2);color:var(--text)}
-  .icon-btn.on{color:var(--accent);background:var(--accent-soft)}
-  .icon-btn.danger:hover{color:var(--danger);background:rgba(229,72,77,.1)}
-  .icon-btn.rec{color:var(--danger);animation:pulse 1.2s infinite}
-  @keyframes pulse{50%{opacity:.4}}
+  /* editor */
+  #scrEditor{background:var(--bg)}
+  .ed-top{display:flex;align-items:center;gap:6px;padding:calc(var(--toppad) + 8px) 12px 8px}
+  .ed-top .sp{flex:1}
   .ed-scroll{flex:1;overflow-y:auto}
-  .ed-inner{max-width:760px;margin:0 auto;padding:26px 30px 120px;width:100%}
-  .ed-title{width:100%;border:none;outline:none;background:none;font-size:27px;font-weight:700;margin-bottom:8px;line-height:1.25}
-  .ed-title::placeholder{color:var(--muted);opacity:.5}
-  .meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;color:var(--muted)}
-  .nb-pick{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--border);font-size:12.5px}
-  .nb-pick select{border:none;background:none;outline:none;font-size:12.5px;color:var(--text);max-width:150px}
-  .rm-chip{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:12.5px}
-  .rm-chip button{color:var(--accent);opacity:.6}
-  .tag-edit{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
-  .tag-edit .t{font-size:12px;background:var(--accent-soft);color:var(--accent);padding:3px 9px;border-radius:14px;display:flex;align-items:center;gap:5px}
-  .tag-edit .t button{color:var(--accent);opacity:.6;font-size:13px}
-  .tag-edit .t button:hover{opacity:1}
-  .tag-edit input{border:none;outline:none;background:none;font-size:12.5px;min-width:90px;padding:3px}
-  .ed-body{width:100%;border:none;outline:none;background:none;font-size:15.5px;line-height:1.7;resize:none;min-height:360px;color:inherit}
-  .ed-body::placeholder{color:var(--muted);opacity:.5}
-  .attachments{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
-  .att{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--panel)}
-  .att img{display:block;max-width:150px;max-height:150px;object-fit:cover}
-  .att .del{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
-  .preview{font-size:15.5px;line-height:1.7}
-  .preview h1{font-size:25px;margin:18px 0 10px}.preview h2{font-size:20px;margin:16px 0 9px}.preview h3{font-size:17px;margin:14px 0 7px}
-  .preview p{margin:9px 0}.preview ul,.preview ol{margin:9px 0 9px 24px}.preview li{margin:3px 0}
-  .preview code{background:var(--panel-2);padding:2px 6px;border-radius:5px;font-size:13.5px;font-family:ui-monospace,Menlo,monospace}
-  .preview pre{background:var(--panel-2);padding:13px;border-radius:10px;overflow-x:auto;margin:11px 0}.preview pre code{background:none;padding:0}
-  .preview blockquote{border-left:3px solid var(--accent);padding:2px 14px;margin:11px 0;color:var(--muted)}
-  .preview a{color:var(--accent)}.preview hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+  .ed-inner{padding:6px 20px 40px}
+  .e-title{width:100%;border:none;outline:none;background:none;font-size:25px;font-weight:700;line-height:1.3;margin-bottom:6px}
+  .e-title::placeholder{color:var(--muted2)}
+  .e-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:8px}
+  .e-meta .mb{display:flex;align-items:center;gap:5px;background:var(--card);padding:4px 10px;border-radius:8px}
+  .e-meta select{border:none;background:none;outline:none;color:var(--text);font-size:13px;max-width:150px}
+  .e-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .e-tags .tg{font-size:12.5px;background:var(--accent);color:#000;padding:3px 10px;border-radius:13px;display:flex;align-items:center;gap:5px;font-weight:500}
+  .e-tags .tg.auto{background:var(--card2);color:var(--accent)}
+  .e-tags .tg button{color:inherit;opacity:.7;font-size:13px}
+  .e-tags input{border:none;outline:none;background:none;font-size:13px;min-width:80px;color:var(--text)}
+  .e-att{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .e-att .a{position:relative;border-radius:10px;overflow:hidden}
+  .e-att img{width:92px;height:92px;object-fit:cover;display:block}
+  .e-att .x{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .e-body{width:100%;border:none;outline:none;background:none;font-size:16.5px;line-height:1.65;resize:none;min-height:50vh;color:var(--text)}
+  .e-body::placeholder{color:var(--muted2)}
+  .preview{font-size:16.5px;line-height:1.65}
+  .preview h1{font-size:25px;margin:16px 0 9px}.preview h2{font-size:21px;margin:15px 0 8px}.preview h3{font-size:18px;margin:13px 0 6px}
+  .preview p{margin:9px 0}.preview ul,.preview ol{margin:9px 0 9px 22px}.preview li{margin:4px 0}
+  .preview code{background:var(--card2);padding:2px 6px;border-radius:5px;font-size:14.5px;font-family:ui-monospace,Menlo,monospace}
+  .preview pre{background:var(--card2);padding:13px;border-radius:10px;overflow-x:auto;margin:11px 0}.preview pre code{background:none;padding:0}
+  .preview blockquote{border-left:3px solid var(--accent);padding:3px 14px;margin:11px 0;color:var(--muted)}
+  .preview a{color:var(--accent)}.preview hr{border:none;border-top:1px solid var(--sep);margin:16px 0}
   .preview img{max-width:100%;border-radius:10px;margin:8px 0}
-  .preview .chk{list-style:none;margin-left:0}.preview .chk li{padding-left:26px;position:relative}.preview .chk input{position:absolute;left:0;top:4px}
-  .preview table{border-collapse:collapse;margin:11px 0;width:100%}.preview th,.preview td{border:1px solid var(--border);padding:7px 11px;text-align:left}.preview th{background:var(--panel-2)}
-  .ed-empty{display:flex;flex:1;align-items:center;justify-content:center;flex-direction:column;color:var(--muted);text-align:center;padding:40px}
-  .ed-empty .big{font-size:52px;margin-bottom:14px;opacity:.35}
-  .locked-view{display:flex;flex:1;align-items:center;justify-content:center;flex-direction:column;color:var(--muted);text-align:center;padding:40px;gap:12px}
-  .locked-view .big{font-size:48px;opacity:.4}
-  .statusbar{padding:7px 18px;border-top:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--muted);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-  .saved{display:flex;align-items:center;gap:5px}.saved .d{width:7px;height:7px;border-radius:50%;background:#2fbf71}
-  .md-tools{display:flex;gap:1px;flex-wrap:wrap}
-  .md-tools button{padding:6px 8px;border-radius:7px;color:var(--muted);font-size:13px;min-width:28px}
-  .md-tools button:hover{background:var(--panel-2);color:var(--text)}
+  .preview .chk{list-style:none;margin-left:0}.preview .chk li{padding-left:28px;position:relative}.preview .chk input{position:absolute;left:0;top:4px;width:18px;height:18px;accent-color:var(--accent)}
+  .preview table{border-collapse:collapse;margin:11px 0;width:100%;font-size:14.5px}.preview th,.preview td{border:1px solid var(--sep);padding:7px 10px;text-align:left}.preview th{background:var(--card2)}
+  .ed-tool{display:flex;align-items:center;gap:2px;padding:7px 10px calc(var(--botpad) + 7px);border-top:1px solid var(--sep);background:var(--card);overflow-x:auto}
+  .ed-tool button{min-width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text);flex-shrink:0}
+  .ed-tool button:active{background:var(--card2)}
+  .ed-tool .div{width:1px;height:22px;background:var(--sep);margin:0 5px;flex-shrink:0}
+  .ed-tool .rec{color:var(--danger);animation:pulse 1.1s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  .ed-status{padding:6px 20px;font-size:12px;color:var(--muted2);display:flex;gap:14px}
 
-  .modal-bg{position:fixed;inset:0;background:rgba(10,12,18,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
-  .modal-bg.show{display:flex}
-  .modal{background:var(--panel);border-radius:16px;padding:22px;width:100%;max-width:400px;box-shadow:var(--shadow);max-height:88vh;overflow-y:auto}
-  .modal h3{font-size:16px;margin-bottom:14px}
-  .modal label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 5px;font-weight:600}
-  .modal input,.modal select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);outline:none;font-size:14px}
-  .modal input:focus,.modal select:focus{border-color:var(--accent)}
-  .swatches{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
-  .swatches button{width:26px;height:26px;border-radius:8px;border:2px solid transparent}
-  .swatches button.sel{border-color:var(--text)}
-  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
-  .modal-actions button{padding:9px 16px;border-radius:9px;font-size:13.5px;font-weight:600}
-  .btn-ghost{color:var(--muted)}.btn-ghost:hover{background:var(--panel-2)}
-  .btn-primary{background:var(--accent);color:#fff}.btn-danger{background:var(--danger);color:#fff}
-  .set-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}
-  .set-row:last-child{border-bottom:none}
-  .set-row .lab{font-size:14px}.set-row .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
-  .toggle{width:42px;height:24px;border-radius:14px;background:var(--border);position:relative;transition:.15s;flex-shrink:0}
-  .toggle.on{background:var(--accent)}
-  .toggle::after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.15s}
-  .toggle.on::after{left:21px}
-  .seg{display:flex;gap:4px;background:var(--panel-2);padding:3px;border-radius:9px}
-  .seg button{flex:1;padding:6px;border-radius:7px;font-size:12.5px;color:var(--muted)}
-  .seg button.on{background:var(--panel);color:var(--text);font-weight:600;box-shadow:var(--shadow)}
-  .menu-btn{width:36px;height:36px;border-radius:9px;display:none;align-items:center;justify-content:center;font-size:18px;color:var(--muted)}
+  /* sheet */
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;display:none;align-items:flex-end;justify-content:center}
+  .sheet-bg.show{display:flex}
+  .sheet{background:var(--card);width:100%;max-width:440px;border-radius:22px 22px 0 0;padding:10px 0 calc(var(--botpad) + 14px);max-height:85vh;overflow-y:auto;animation:sheetUp .26s cubic-bezier(.3,.7,.3,1)}
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .sheet .grab{width:38px;height:5px;border-radius:3px;background:var(--muted2);margin:4px auto 10px}
+  .sheet h3{font-size:18px;font-weight:700;padding:4px 22px 12px}
+  .sheet .srow{display:flex;align-items:center;gap:13px;padding:14px 22px;font-size:17px}
+  .sheet .srow:active{background:var(--card2)}
+  .sheet .srow .ic{width:24px;text-align:center;font-size:18px;color:var(--accent)}
+  .sheet .srow.danger{color:var(--danger)}.sheet .srow.danger .ic{color:var(--danger)}
+  .sheet .srow .ck{margin-left:auto;color:var(--accent);font-size:18px}
+  .sheet input[type=text],.sheet input[type=password],.sheet input[type=datetime-local]{width:calc(100% - 44px);margin:0 22px 10px;padding:12px 14px;border-radius:11px;background:var(--card2);border:none;outline:none;font-size:16px}
+  .sheet .field-label{padding:6px 22px 4px;font-size:13px;color:var(--muted);font-weight:600}
+  .swrow{display:flex;gap:10px;padding:10px 22px;flex-wrap:wrap}
+  .swrow button{width:32px;height:32px;border-radius:50%;border:2px solid transparent}
+  .swrow button.sel{border-color:var(--text);transform:scale(1.1)}
+  .sheet .sbtn{display:block;width:calc(100% - 44px);margin:8px 22px 0;padding:13px;border-radius:12px;background:var(--accent);color:#000;font-weight:600;font-size:16px;text-align:center}
+  .sheet .sbtn.sec{background:var(--card2);color:var(--text)}
+  .sheet .sbtn.dngr{background:transparent;color:var(--danger)}
+  .toggle{width:50px;height:30px;border-radius:15px;background:var(--muted2);position:relative;transition:.15s;flex-shrink:0;margin-left:auto}
+  .toggle.on{background:var(--green)}
+  .toggle::after{content:"";position:absolute;width:26px;height:26px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.15s}
+  .toggle.on::after{left:22px}
+  .slider{width:calc(100% - 44px);margin:10px 22px}
+  .seg{display:flex;gap:4px;background:var(--card2);padding:4px;border-radius:11px;margin:4px 22px 10px}
+  .seg button{flex:1;padding:9px;border-radius:8px;font-size:14px;color:var(--muted)}
+  .seg button.on{background:var(--card);color:var(--text);font-weight:600}
+  [data-theme="light"] .seg button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+
+  /* premium-style banner */
+  .promo{margin:4px 16px 20px;border-radius:var(--radius);padding:16px;background:linear-gradient(120deg,#2a2410,#1c1c1e);border:1px solid rgba(245,179,1,.3);display:flex;align-items:center;gap:13px}
+  .promo .pic{width:40px;height:40px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;color:#000;flex-shrink:0}
+  .promo .pt{font-size:16px;font-weight:700}
+  .promo .ps{font-size:13px;color:var(--muted);margin-top:1px}
 
   /* lock screen */
-  .lockscreen{position:fixed;inset:0;background:var(--bg);z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:30px}
+  .lockscreen{position:fixed;inset:0;background:var(--bg);z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:30px}
   .lockscreen.show{display:flex}
-  .lock-ic{font-size:46px}
-  .pin-dots{display:flex;gap:14px}
+  .lock-ic{font-size:44px}
+  .pin-dots{display:flex;gap:16px}
   .pin-dots .pd{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
   .pin-dots .pd.on{background:var(--accent);border-color:var(--accent)}
-  .pin-pad{display:grid;grid-template-columns:repeat(3,70px);gap:14px}
-  .pin-pad button{height:70px;border-radius:50%;background:var(--panel);font-size:24px;box-shadow:var(--shadow)}
-  .pin-pad button:active{background:var(--accent-soft)}
   .pin-err{color:var(--danger);font-size:13px;height:16px}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,74px);gap:16px}
+  .pin-pad button{height:74px;border-radius:50%;background:var(--card);font-size:26px}
+  .pin-pad button:active{background:var(--card2)}
 
-  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:13.5px;z-index:120;opacity:0;transition:.25s;box-shadow:var(--shadow)}
+  .toast{position:fixed;bottom:calc(var(--botpad) + 90px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--card2);color:var(--text);padding:12px 20px;border-radius:14px;font-size:14.5px;z-index:140;opacity:0;transition:.25s;box-shadow:0 8px 24px rgba(0,0,0,.4);pointer-events:none;max-width:90%;text-align:center}
   .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-
-  @media(max-width:900px){
-    .app{grid-template-columns:1fr}
-    .sidebar,.list,.editor{position:absolute;inset:0;z-index:1}
-    .sidebar{transform:translateX(-100%);transition:transform .22s;z-index:3;width:270px;box-shadow:var(--shadow)}
-    .sidebar.open{transform:translateX(0)}
-    .editor{z-index:2;transform:translateX(100%);transition:transform .22s}
-    .editor.open{transform:translateX(0)}
-    .menu-btn{display:flex}
-    .scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:2;display:none}
-    .scrim.show{display:block}
-  }
+  .hidden{display:none!important}
 </style>
 </head>
 <body>
-<div class="app" id="app">
-  <aside class="sidebar" id="sidebar">
-    <div class="brand"><span class="dot">✎</span> NoteNest</div>
-    <div class="nav" id="nav"></div>
-    <div class="foot">
-      <button id="setBtn">⚙ Settings</button>
-      <button id="exportAll">⬇ Backup</button>
-      <button id="importBtn">⬆ Import</button>
-      <input type="file" id="importFile" accept="application/json" hidden>
+<div id="app">
+  <!-- FOLDERS -->
+  <section class="screen show" id="scrFolders">
+    <div class="sc-head">
+      <div class="hactions"><button class="hbtn" id="fAddFolder">🗂</button><button class="hbtn pill" id="fEdit">Edit</button></div>
+      <h1>Folders</h1>
     </div>
-  </aside>
-  <div class="scrim" id="scrim"></div>
-
-  <section class="list" id="listPane">
-    <div class="list-head">
-      <div class="list-title">
-        <div style="display:flex;align-items:center;gap:8px;min-width:0">
-          <button class="menu-btn" id="menuBtn">☰</button>
-          <h2 id="listTitle">All Notes</h2>
-        </div>
-        <div class="head-btns">
-          <button class="btn-sel" id="selBtn" title="Select">☑</button>
-          <button class="btn-new" id="newBtn">+ New</button>
-        </div>
-      </div>
-      <div class="search"><span class="ic">🔍</span><input id="searchInput" placeholder="নোট খুঁজুন..."></div>
-      <div class="sort">
-        <button data-sort="updated" class="active">Recent</button>
-        <button data-sort="created">Created</button>
-        <button data-sort="title">A–Z</button>
-      </div>
-      <div id="selBar" style="display:none;gap:6px;margin-top:9px">
-        <button class="btn-sel" id="selExport">⬇ Export</button>
-        <button class="btn-sel" id="selDelete">🗑 Delete</button>
-        <button class="btn-sel" id="selCancel">✕ Cancel</button>
-      </div>
+    <div class="sc-body" id="foldersBody"></div>
+    <div class="sc-bottom">
+      <div class="searchbar"><span>🔍</span><input id="fSearch" placeholder="Search" readonly></div>
+      <button class="fab" id="fCompose">✎</button>
     </div>
-    <div class="notes" id="notes"></div>
   </section>
 
-  <section class="editor" id="editorPane">
-    <div id="edContent" style="display:flex;flex-direction:column;flex:1;min-height:0">
-      <div class="ed-bar">
-        <button class="menu-btn" id="backBtn">←</button>
-        <div class="md-tools" id="mdTools">
-          <button data-md="h" title="Heading">H</button>
-          <button data-md="b" title="Bold"><b>B</b></button>
-          <button data-md="i" title="Italic"><i>I</i></button>
-          <button data-md="ul" title="List">•</button>
-          <button data-md="chk" title="Checklist">☑</button>
-          <button data-md="code" title="Code">&lt;/&gt;</button>
-          <button data-md="quote" title="Quote">❝</button>
-          <button data-md="link" title="Link">🔗</button>
-        </div>
-        <div class="spacer"></div>
-        <button class="icon-btn" id="voiceBtn" title="Voice to text">🎤</button>
-        <button class="icon-btn" id="imgBtn" title="Attach image">📎</button>
-        <button class="icon-btn" id="remindBtn" title="Reminder">⏰</button>
-        <button class="icon-btn" id="colorBtn" title="Note color">🎨</button>
-        <button class="icon-btn" id="pinBtn" title="Pin">📌</button>
-        <button class="icon-btn" id="favBtn" title="Favorite">☆</button>
-        <button class="icon-btn" id="lockBtn" title="Lock note">🔓</button>
-        <button class="icon-btn" id="previewBtn" title="Preview">👁</button>
-        <button class="icon-btn" id="dlBtn" title="Export">⬇</button>
-        <button class="icon-btn danger" id="delBtn" title="Delete">🗑</button>
-        <input type="file" id="imgFile" accept="image/*" hidden multiple>
+  <!-- LIST -->
+  <section class="screen" id="scrList">
+    <div class="sc-head">
+      <div class="hactions" style="justify-content:space-between">
+        <button class="hbtn back plain" id="lBack">‹</button>
+        <div style="display:flex;gap:10px"><button class="hbtn" id="lSelect">◉</button><button class="hbtn" id="lAddFolder">🗂</button></div>
       </div>
-      <div class="ed-scroll" id="edScroll">
-        <div class="ed-inner" id="edInner">
-          <input class="ed-title" id="edTitle" placeholder="শিরোনাম...">
-          <div class="meta-row">
-            <div class="nb-pick">📁 <select id="nbSelect"></select></div>
-            <span id="edDate"></span>
-            <span class="rm-chip" id="rmChip" style="display:none"></span>
-          </div>
-          <div class="tag-edit" id="tagEdit"></div>
-          <div class="attachments" id="attachments"></div>
-          <textarea class="ed-body" id="edBody" placeholder="লেখা শুরু করুন... (Markdown ও #ট্যাগ সাপোর্ট করে)"></textarea>
-          <div class="preview" id="edPreview" style="display:none"></div>
-        </div>
-      </div>
-      <div class="statusbar">
-        <span class="saved"><span class="d"></span><span id="savedTxt">Saved</span></span>
-        <span id="wordCount">0 words</span><span id="charCount">0 chars</span>
+      <h1 id="lTitle">Notes</h1>
+      <div id="lSelBar" class="hidden" style="display:flex;gap:10px;margin-top:10px">
+        <button class="hbtn pill" id="lExport">Export</button>
+        <button class="hbtn pill" id="lDelete" style="color:var(--danger)">Delete</button>
+        <button class="hbtn pill" id="lCancelSel">Cancel</button>
       </div>
     </div>
-    <div class="ed-empty" id="edEmpty">
-      <div class="big">✎</div>
-      <div style="font-weight:600;font-size:16px;color:var(--text);margin-bottom:5px">কোনো নোট নির্বাচন করুন</div>
-      <div>বাঁদিক থেকে একটি নোট বেছে নিন, বা নতুন নোট তৈরি করুন।</div>
+    <div class="sc-body" id="listBody"></div>
+    <div class="sc-bottom">
+      <div class="searchbar"><span>🔍</span><input id="lSearch" placeholder="Search"></div>
+      <button class="fab" id="lCompose">✎</button>
     </div>
-    <div class="locked-view" id="edLocked">
-      <div class="big">🔒</div>
-      <div style="font-weight:600;font-size:16px;color:var(--text)">এই নোটটি লক করা</div>
-      <button class="btn-primary" id="unlockNote" style="padding:10px 18px;border-radius:10px">আনলক করুন</button>
+  </section>
+
+  <!-- EDITOR -->
+  <section class="screen" id="scrEditor">
+    <div class="ed-top">
+      <button class="hbtn back plain" id="eBack">‹</button>
+      <div class="sp"></div>
+      <button class="hbtn" id="ePreview">👁</button>
+      <button class="hbtn" id="eMenu">⋯</button>
     </div>
+    <div class="ed-scroll">
+      <div class="ed-inner">
+        <input class="e-title" id="eTitle" placeholder="Title">
+        <div class="e-meta" id="eMeta"></div>
+        <div class="e-tags" id="eTags"></div>
+        <div class="e-att" id="eAtt"></div>
+        <textarea class="e-body" id="eBody" placeholder="Start writing…  (Markdown & #tags supported)"></textarea>
+        <div class="preview" id="ePrev" style="display:none"></div>
+      </div>
+    </div>
+    <div class="ed-status"><span id="eWords">0 words</span><span id="eSaved">Saved</span></div>
+    <div class="ed-tool" id="eTool">
+      <button data-md="h1">H1</button><button data-md="h2">H2</button>
+      <button data-md="b"><b>B</b></button><button data-md="i"><i>I</i></button>
+      <span class="div"></span>
+      <button data-md="ul">•</button><button data-md="ol">1.</button><button data-md="chk">☑</button>
+      <button data-md="quote">❝</button><button data-md="code">&lt;/&gt;</button><button data-md="table">▦</button><button data-md="link">🔗</button>
+      <span class="div"></span>
+      <button id="eVoice">🎤</button><button id="eImg">📎</button>
+      <input type="file" id="eImgFile" accept="image/*" multiple hidden>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen" id="scrSettings">
+    <div class="sc-head"><div class="hactions" style="justify-content:flex-start"><button class="hbtn back plain" id="sBack">‹</button></div><h1>Settings</h1></div>
+    <div class="sc-body" id="settingsBody"></div>
   </section>
 </div>
 
-<!-- Notebook modal -->
-<div class="modal-bg" id="nbModal"><div class="modal">
-  <h3 id="nbModalTitle">নতুন নোটবুক</h3>
-  <label>নাম</label><input id="nbName" placeholder="নোটবুকের নাম" maxlength="40">
-  <label>রঙ</label><div class="swatches" id="nbSwatches"></div>
-  <label>প্যারেন্ট ফোল্ডার (সাবফোল্ডার হিসেবে)</label><select id="nbParent"></select>
-  <div class="modal-actions">
-    <button class="btn-danger" id="nbDelete" style="margin-right:auto;display:none">মুছুন</button>
-    <button class="btn-ghost" id="nbCancel">বাতিল</button>
-    <button class="btn-primary" id="nbSave">সেভ</button>
-  </div>
-</div></div>
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
 
-<!-- Reminder modal -->
-<div class="modal-bg" id="rmModal"><div class="modal">
-  <h3>রিমাইন্ডার সেট করুন</h3>
-  <label>তারিখ ও সময়</label><input type="datetime-local" id="rmInput">
-  <div class="modal-actions">
-    <button class="btn-danger" id="rmRemove" style="margin-right:auto">সরান</button>
-    <button class="btn-ghost" id="rmCancel">বাতিল</button>
-    <button class="btn-primary" id="rmSave">সেট</button>
-  </div>
-</div></div>
-
-<!-- Color modal -->
-<div class="modal-bg" id="colorModal"><div class="modal">
-  <h3>নোটের ব্যাকগ্রাউন্ড কালার</h3>
-  <div class="swatches" id="colorSwatches" style="margin-top:10px"></div>
-  <div class="modal-actions"><button class="btn-ghost" id="colorCancel">বন্ধ</button></div>
-</div></div>
-
-<!-- Settings modal -->
-<div class="modal-bg" id="setModal"><div class="modal">
-  <h3>⚙ Settings</h3>
-  <label>থিম</label>
-  <div class="seg" id="themeSeg"><button data-t="light">☀ Light</button><button data-t="dark">🌙 Dark</button><button data-t="auto">🔄 Auto</button></div>
-  <label>ফন্ট</label>
-  <select id="fontSel">
-    <option value="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Bengali',sans-serif">System (ডিফল্ট)</option>
-    <option value="Georgia,'Noto Serif Bengali',serif">Serif</option>
-    <option value="ui-monospace,Menlo,monospace">Monospace</option>
-  </select>
-  <label>লেখার সাইজ: <span id="fsVal">15</span>px</label>
-  <input type="range" id="fsRange" min="13" max="20" step="1" style="padding:0">
-  <div style="border-top:1px solid var(--border);margin:16px 0 4px"></div>
-  <div class="set-row"><div><div class="lab">🔒 App Lock</div><div class="sub">অ্যাপ খুললে পাসকোড লাগবে</div></div><div class="toggle" id="appLockToggle"></div></div>
-  <div class="set-row"><div><div class="lab">📝 Note Lock</div><div class="sub">আলাদা নোট লক করার পাসওয়ার্ড</div></div><div class="toggle" id="noteLockToggle"></div></div>
-  <div class="set-row"><div><div class="lab">🔔 রিমাইন্ডার নোটিফিকেশন</div><div class="sub">ব্রাউজার পারমিশন</div></div><button class="btn-sel" id="notifBtn">চালু করুন</button></div>
-  <div style="border-top:1px solid var(--border);margin:16px 0 4px"></div>
-  <label>☁ Google Drive Sync</label>
-  <input id="driveCid" placeholder="Client ID (…apps.googleusercontent.com)" autocomplete="off">
-  <div class="set-row"><div><div class="lab" id="driveStatus">সংযুক্ত নয়</div><div class="sub" id="driveSub">সব ডিভাইসে নোট সিঙ্ক করুন</div></div><button class="btn-sel" id="driveBtn">Connect</button></div>
-  <button class="btn-sel" id="syncNow" style="width:100%;margin-top:4px">🔄 এখন সিঙ্ক করুন</button>
-  <div class="modal-actions"><button class="btn-primary" id="setClose">বন্ধ</button></div>
-</div></div>
-
-<!-- Passcode set/enter modal -->
-<div class="modal-bg" id="pcModal"><div class="modal">
-  <h3 id="pcTitle">পাসকোড দিন</h3>
-  <input id="pcInput" type="password" inputmode="numeric" placeholder="৪-৬ সংখ্যা" maxlength="6">
-  <div id="pcErr" style="color:var(--danger);font-size:12.5px;height:16px;margin-top:6px"></div>
-  <div class="modal-actions"><button class="btn-ghost" id="pcCancel">বাতিল</button><button class="btn-primary" id="pcOk">ঠিক আছে</button></div>
-</div></div>
-
-<!-- Confirm modal -->
-<div class="modal-bg" id="confirmModal"><div class="modal">
-  <h3 id="confirmTitle">নিশ্চিত?</h3><div id="confirmSub" class="sub" style="margin-bottom:6px"></div>
-  <div class="modal-actions"><button class="btn-ghost" id="confirmCancel">না</button><button class="btn-danger" id="confirmOk">হ্যাঁ</button></div>
-</div></div>
-
-<!-- App lock screen -->
 <div class="lockscreen" id="lockScreen">
   <div class="lock-ic">🔒</div>
-  <div style="font-weight:600;font-size:17px">NoteNest লকড</div>
+  <div style="font-weight:600;font-size:18px">NoteNest Locked</div>
   <div class="pin-dots" id="pinDots"></div>
   <div class="pin-err" id="pinErr"></div>
   <div class="pin-pad" id="pinPad"></div>
@@ -377,40 +268,44 @@
 
 <script>
 "use strict";
-const KEY="notenest.v2";
-const COLORS=["#5b6cff","#2fbf71","#ff8a3d","#e5484d","#a259ff","#00b8d9","#ec4899","#8b93a1"];
-const NOTECOLORS=["","#fff4d6","#ffe0e0","#e0f0ff","#e3f9e5","#f0e6ff","#ffe8d6","#e8eaed"];
-const NOTECOLORS_DARK=["","#3a3320","#3a2424","#1f2d3a","#1f3524","#2d243a","#3a2d20","#252a33"];
-let store={notebooks:[],notes:[],settings:{theme:"light",font:"",fontSize:15,appLock:"",noteLock:""}};
-let state={view:"all",nb:null,tag:null,activeId:null,sort:"updated",preview:false,query:"",selMode:false,sel:new Set(),unlocked:new Set()};
-let saveTimer=null,nbEditing=null,confirmCb=null,pendingSwatch=COLORS[0],recog=null,recording=false,pcMode="",pcCb=null,pinBuf="";
+/* ============ data / storage (IndexedDB) ============ */
+const QUICK="quick";
+const COLORS=["#f5b301","#ff9500","#ff453a","#ff375f","#bf5af2","#0a84ff","#30d158","#64d2ff","#8e8e93"];
+const NOTECOLORS=["", "#2a2410","#2a1a1a","#1a2432","#1f2d1a","#241a2d","#2d2416"];
+let store={notebooks:[],notes:[],settings:{}};
+let state={screen:"folders",view:"quick",nb:null,query:"",activeId:null,selMode:false,sel:new Set(),unlocked:new Set(),editFolders:false};
+let navStack=[];
 
-/* ---------- storage ---------- */
-function load(){
-  try{const r=localStorage.getItem(KEY);if(r)store=JSON.parse(r);}catch(e){}
-  store.notebooks=store.notebooks||[];store.notes=store.notes||[];
-  store.settings=Object.assign({theme:"light",font:"",fontSize:15,appLock:"",noteLock:"",driveClientId:"",lastSync:0},store.settings||{});
-  if(!store.notebooks.length){
-    store.notebooks.push({id:uid(),name:"Personal",color:"#5b6cff",parent:null});
-    store.notebooks.push({id:uid(),name:"Work",color:"#2fbf71",parent:null});
-  }
-  if(!store.notes.length){
-    const nb=store.notebooks[0].id;
-    store.notes.push({id:uid(),title:"স্বাগতম! 👋",body:"# NoteNest-এ স্বাগতম\n\nআপনার নিজের নোট অ্যাপ — সব ডেটা **আপনার ডিভাইসেই** সেভ থাকে।\n\n## ফিচার\n- নোটবুক ও **সাবফোল্ডার**\n- Markdown ও #ট্যাগ\n- চেকলিস্ট:\n  - [x] অ্যাপ খোলা\n  - [ ] প্রথম নোট লেখা\n- 🎤 ভয়েস-টু-টেক্সট, 📎 ছবি অ্যাটাচ\n- ⏰ রিমাইন্ডার, 🎨 কালার, 🔒 লক\n- পিন, ফেভারিট, সার্চ, এক্সপোর্ট\n\n> টুলবার থেকে সব ফিচার পাবেন।",notebook:nb,tags:["শুরু"],pinned:true,fav:false,trashed:false,color:"",locked:false,remindAt:null,attachments:[],created:Date.now(),updated:Date.now()});
-  }
-  store.notes.forEach(n=>{n.attachments=n.attachments||[];if(n.color===undefined)n.color="";if(n.locked===undefined)n.locked=false;if(n.remindAt===undefined)n.remindAt=null;});
-  store.notebooks.forEach(nb=>{if(nb.parent===undefined)nb.parent=null;});
-}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){toast("⚠ স্টোরেজ পূর্ণ — কিছু ছবি সরান");}schedulePush();}
-function normalizeStore(){
-  store.notebooks=store.notebooks||[];store.notes=store.notes||[];
-  store.settings=Object.assign({theme:"light",font:"",fontSize:15,appLock:"",noteLock:"",driveClientId:"",lastSync:0},store.settings||{});
-  store.notes.forEach(n=>{n.attachments=n.attachments||[];if(n.color===undefined)n.color="";if(n.locked===undefined)n.locked=false;if(n.remindAt===undefined)n.remindAt=null;if(n.tags===undefined)n.tags=[];});
-  store.notebooks.forEach(nb=>{if(nb.parent===undefined)nb.parent=null;});
-}
+const IDB={db:null};
+function idbOpen(){return new Promise((res)=>{if(IDB.db)return res(IDB.db);const r=indexedDB.open("notenest-db",1);r.onupgradeneeded=()=>{r.result.createObjectStore("kv");};r.onsuccess=()=>{IDB.db=r.result;res(IDB.db);};r.onerror=()=>res(null);});}
+async function idbGet(k){const db=await idbOpen();if(!db)return null;return new Promise(res=>{try{const g=db.transaction("kv","readonly").objectStore("kv").get(k);g.onsuccess=()=>res(g.result);g.onerror=()=>res(null);}catch(e){res(null);}});}
+async function idbSet(k,v){const db=await idbOpen();if(!db)return;return new Promise(res=>{try{const t=db.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=()=>res();t.onerror=()=>res();}catch(e){res();}});}
+
+let persistTimer=null;
+function save(){clearTimeout(persistTimer);persistTimer=setTimeout(()=>{idbSet("store",store);},120);schedulePush();}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 
-/* ---------- markdown ---------- */
+function normalizeStore(){
+  store.notebooks=store.notebooks||[];store.notes=store.notes||[];
+  store.settings=Object.assign({theme:"dark",font:"",fontSize:16,appLock:"",noteLock:"",driveClientId:"",lastSync:0,sortBy:"updated",notesStart:"title"},store.settings||{});
+  if(!store.notebooks.some(n=>n.special===QUICK))store.notebooks.unshift({id:QUICK,name:"Quick Notes",color:"#f5b301",parent:null,special:QUICK});
+  store.notes.forEach(n=>{n.attachments=n.attachments||[];if(n.color===undefined)n.color="";if(n.locked===undefined)n.locked=false;if(n.remindAt===undefined)n.remindAt=null;if(n.tags===undefined)n.tags=[];if(!n.notebook)n.notebook=QUICK;});
+  store.notebooks.forEach(nb=>{if(nb.parent===undefined)nb.parent=null;});
+}
+function seed(){
+  if(!store.notebooks.some(n=>!n.special)){store.notebooks.push({id:uid(),name:"Notes",color:"#0a84ff",parent:null});store.notebooks.push({id:uid(),name:"Life Experience",color:"#30d158",parent:null});}
+  if(!store.notes.length){
+    store.notes.push({id:uid(),title:"Welcome to NoteNest 👋",body:"Your own private notes app — everything is stored **on your device** and synced to Google Drive.\n\n## What you can do\n- Folders & subfolders\n- Markdown & #tags\n- Checklists:\n  - [x] Open the app\n  - [ ] Write your first note\n- 🎤 Voice-to-text, 📎 photos\n- ⏰ Reminders, 🎨 colors, 🔒 locks\n- Pin, search, export & Drive sync\n\n> Use the toolbar at the bottom while editing.",notebook:QUICK,tags:["welcome"],pinned:true,trashed:false,color:"",locked:false,remindAt:null,attachments:[],created:Date.now(),updated:Date.now()});
+  }
+}
+async function load(){
+  let data=await idbGet("store");
+  if(!data){try{const r=localStorage.getItem("notenest.v2");if(r)data=JSON.parse(r);}catch(e){}}
+  if(data)store=data;
+  normalizeStore();seed();save();
+}
+
+/* ============ markdown ============ */
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function mdInline(s){
   s=esc(s);
@@ -419,474 +314,445 @@ function mdInline(s){
   s=s.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
   s=s.replace(/(^|[^*])\*([^*]+)\*/g,"$1<em>$2</em>");
   s=s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
-  s=s.replace(/(^|\s)#([^\s#][^\s]*)/g,'$1<a style="color:var(--accent)">#$2</a>');
+  s=s.replace(/(^|\s)#([^\s#][^\s]*)/g,'$1<span style="color:var(--accent)">#$2</span>');
   return s;
 }
 function renderMD(src){
   const lines=(src||"").split("\n");let html="",i=0;
-  while(i<lines.length){
-    let l=lines[i];
+  while(i<lines.length){let l=lines[i];
     if(/^```/.test(l)){let c="";i++;while(i<lines.length&&!/^```/.test(lines[i])){c+=lines[i]+"\n";i++;}i++;html+="<pre><code>"+esc(c)+"</code></pre>";continue;}
     if(/^### /.test(l)){html+="<h3>"+mdInline(l.slice(4))+"</h3>";i++;continue;}
     if(/^## /.test(l)){html+="<h2>"+mdInline(l.slice(3))+"</h2>";i++;continue;}
     if(/^# /.test(l)){html+="<h1>"+mdInline(l.slice(2))+"</h1>";i++;continue;}
     if(/^> /.test(l)){let q="";while(i<lines.length&&/^> /.test(lines[i])){q+=lines[i].slice(2)+" ";i++;}html+="<blockquote>"+mdInline(q.trim())+"</blockquote>";continue;}
     if(/^(-{3,}|\*{3,})$/.test(l)){html+="<hr>";i++;continue;}
-    if(/^\s*[-*] \[[ xX]\]/.test(l)){let items="";while(i<lines.length&&/^\s*[-*] \[[ xX]\]/.test(lines[i])){let m=lines[i].match(/\[([ xX])\]\s?(.*)/);items+='<li><input type="checkbox" disabled '+(m[1].toLowerCase()==="x"?"checked":"")+">"+mdInline(m[2])+"</li>";i++;}html+='<ul class="chk">'+items+"</ul>";continue;}
-    if(/^\s*[-*] /.test(l)){let items="";while(i<lines.length&&/^\s*[-*] /.test(lines[i])&&!/\[[ xX]\]/.test(lines[i])){items+="<li>"+mdInline(lines[i].replace(/^\s*[-*] /,""))+"</li>";i++;}html+="<ul>"+items+"</ul>";continue;}
-    if(/^\s*\d+\. /.test(l)){let items="";while(i<lines.length&&/^\s*\d+\. /.test(lines[i])){items+="<li>"+mdInline(lines[i].replace(/^\s*\d+\. /,""))+"</li>";i++;}html+="<ol>"+items+"</ol>";continue;}
+    if(/^\s*[-*] \[[ xX]\]/.test(l)){let it="";while(i<lines.length&&/^\s*[-*] \[[ xX]\]/.test(lines[i])){let m=lines[i].match(/\[([ xX])\]\s?(.*)/);it+='<li><input type="checkbox" disabled '+(m[1].toLowerCase()==="x"?"checked":"")+">"+mdInline(m[2])+"</li>";i++;}html+='<ul class="chk">'+it+"</ul>";continue;}
+    if(/^\s*[-*] /.test(l)){let it="";while(i<lines.length&&/^\s*[-*] /.test(lines[i])&&!/\[[ xX]\]/.test(lines[i])){it+="<li>"+mdInline(lines[i].replace(/^\s*[-*] /,""))+"</li>";i++;}html+="<ul>"+it+"</ul>";continue;}
+    if(/^\s*\d+\. /.test(l)){let it="";while(i<lines.length&&/^\s*\d+\. /.test(lines[i])){it+="<li>"+mdInline(lines[i].replace(/^\s*\d+\. /,""))+"</li>";i++;}html+="<ol>"+it+"</ol>";continue;}
     if(l.includes("|")&&i+1<lines.length&&/^\s*\|?[-: |]+\|?\s*$/.test(lines[i+1])){
       const row=x=>x.replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
       let head=row(l);i+=2;let body="";
       while(i<lines.length&&lines[i].includes("|")){body+="<tr>"+row(lines[i]).map(c=>"<td>"+mdInline(c)+"</td>").join("")+"</tr>";i++;}
-      html+="<table><thead><tr>"+head.map(c=>"<th>"+mdInline(c)+"</th>").join("")+"</tr></thead><tbody>"+body+"</tbody></table>";continue;
-    }
+      html+="<table><thead><tr>"+head.map(c=>"<th>"+mdInline(c)+"</th>").join("")+"</tr></thead><tbody>"+body+"</tbody></table>";continue;}
     if(l.trim()===""){i++;continue;}
     let p=l;i++;while(i<lines.length&&lines[i].trim()!==""&&!/^(#|>|```|\s*[-*] |\s*\d+\. )/.test(lines[i])){p+=" "+lines[i];i++;}
     html+="<p>"+mdInline(p)+"</p>";
   }
-  return html||'<p style="color:var(--muted)">খালি নোট</p>';
+  return html||'<p style="color:var(--muted)">Empty note</p>';
 }
 
-/* ---------- helpers ---------- */
+/* ============ helpers ============ */
 function nbById(id){return store.notebooks.find(n=>n.id===id);}
 function activeNote(){return store.notes.find(n=>n.id===state.activeId);}
 function descendants(id){let r=[id];store.notebooks.filter(n=>n.parent===id).forEach(c=>r=r.concat(descendants(c.id)));return r;}
-function autoTags(body){const m=(body||"").match(/(?:^|\s)#([^\s#][^\s]*)/g)||[];return[...new Set(m.map(x=>x.trim().replace(/^#/,"")))];}
+function autoTags(b){const m=(b||"").match(/(?:^|\s)#([^\s#][^\s]*)/g)||[];return[...new Set(m.map(x=>x.trim().replace(/^#/,"")))];}
 function noteTags(n){return[...new Set([...(n.tags||[]),...autoTags(n.body)])];}
 function allTags(){const s=new Set();store.notes.filter(n=>!n.trashed).forEach(n=>noteTags(n).forEach(t=>s.add(t)));return[...s].sort();}
-function fmtDate(ts){const d=new Date(ts),now=new Date();const diff=(now-d)/1000;
-  if(diff<60)return"এইমাত্র";if(diff<3600)return Math.floor(diff/60)+" মিনিট আগে";
-  if(diff<86400&&now.getDate()===d.getDate())return d.toLocaleTimeString("bn-BD",{hour:"2-digit",minute:"2-digit"});
-  return d.toLocaleDateString("bn-BD",{day:"numeric",month:"short",year:d.getFullYear()!==now.getFullYear()?"numeric":undefined});}
-function fmtDT(ts){return new Date(ts).toLocaleString("bn-BD",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});}
-function plain(md){return(md||"").replace(/!\[[^\]]*\]\([^)]*\)/g,"🖼").replace(/[#*`>\-\[\]]/g," ").replace(/\n/g," ").replace(/\s+/g," ").trim();}
+function noteTitle(n){if(n.title&&n.title.trim())return n.title.trim();const fl=(n.body||"").split("\n").map(l=>l.replace(/^#+\s*/,"").replace(/^[-*]\s*(\[[ xX]\]\s*)?/,"").trim()).find(l=>l);return fl||"New Note";}
+function plain(md){return(md||"").replace(/!\[[^\]]*\]\([^)]*\)/g,"🖼").replace(/[#*`>\[\]]/g,"").replace(/^[-*]\s*/gm,"").replace(/\n/g," ").replace(/\s+/g," ").trim();}
+function firstImage(n){const a=(n.attachments||[]).find(x=>x.type==="image");return a?a.data:null;}
+function fmtDate(ts){const d=new Date(ts),now=new Date(),diff=(now-d)/1000;
+  if(diff<60)return"just now";if(diff<3600)return Math.floor(diff/60)+"m ago";
+  if(now.toDateString()===d.toDateString())return d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+  const y=new Date(now-864e5);if(y.toDateString()===d.toDateString())return"Yesterday";
+  return d.toLocaleDateString("en-US",{day:"numeric",month:"short",year:d.getFullYear()!==now.getFullYear()?"numeric":undefined});}
+function fmtDT(ts){return new Date(ts).toLocaleString("en-US",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});}
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2200);}
-function isDark(){return document.documentElement.getAttribute("data-theme")==="dark";}
+function folderIcon(c){return '<svg width="27" height="27" viewBox="0 0 24 24" fill="none"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v7A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5v-9Z" fill="'+c+'" fill-opacity=".22"/><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v7A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5v-9Z" stroke="'+c+'" stroke-width="1.6"/></svg>';}
 
-/* ---------- filtering ---------- */
+/* ============ filtering ============ */
 function filtered(){
-  let ns=store.notes.slice();
-  if(state.view==="trash")ns=ns.filter(n=>n.trashed);else ns=ns.filter(n=>!n.trashed);
-  if(state.view==="fav")ns=ns.filter(n=>n.fav);
-  if(state.view==="notebook"&&state.nb){const ids=descendants(state.nb);ns=ns.filter(n=>ids.includes(n.notebook));}
-  if(state.view==="tag"&&state.tag)ns=ns.filter(n=>noteTags(n).includes(state.tag));
-  if(state.query){const q=state.query.toLowerCase();ns=ns.filter(n=>!n.locked&&((n.title||"").toLowerCase().includes(q)||(n.body||"").toLowerCase().includes(q)||noteTags(n).some(t=>t.toLowerCase().includes(q))));}
-  ns.sort((a,b)=>{
-    if(state.view!=="trash"){if(a.pinned&&!b.pinned)return -1;if(!a.pinned&&b.pinned)return 1;}
-    if(state.sort==="title")return(a.title||"").localeCompare(b.title||"");
-    if(state.sort==="created")return b.created-a.created;
-    return b.updated-a.updated;
-  });
+  let ns;
+  if(state.view==="trash")ns=store.notes.filter(n=>n.trashed);
+  else{ns=store.notes.filter(n=>!n.trashed);
+    if(state.view==="pinned")ns=ns.filter(n=>n.pinned);
+    else if(state.view==="quick")ns=ns.filter(n=>n.notebook===QUICK);
+    else if(state.view==="folder"&&state.nb){const ids=descendants(state.nb);ns=ns.filter(n=>ids.includes(n.notebook));}
+    else if(state.view==="tag"&&state.nb)ns=ns.filter(n=>noteTags(n).includes(state.nb));
+  }
+  if(state.query){const q=state.query.toLowerCase();ns=ns.filter(n=>!n.locked&&(noteTitle(n).toLowerCase().includes(q)||(n.body||"").toLowerCase().includes(q)||noteTags(n).some(t=>t.toLowerCase().includes(q))));}
+  const by=store.settings.sortBy;
+  ns=ns.slice().sort((a,b)=>{if(state.view!=="trash"){if(a.pinned&&!b.pinned)return -1;if(!a.pinned&&b.pinned)return 1;}if(by==="title")return noteTitle(a).localeCompare(noteTitle(b));if(by==="created")return b.created-a.created;return b.updated-a.updated;});
   return ns;
 }
 
-/* ---------- nav ---------- */
-function renderNav(){
+/* ============ navigation ============ */
+const SCREEN={folders:"scrFolders",list:"scrList",editor:"scrEditor",settings:"scrSettings"};
+function renderScreen(name){if(name==="folders")renderFolders();else if(name==="list")renderList();else if(name==="editor")renderEditor();else if(name==="settings")renderSettings();}
+function showScreen(name,anim){
+  renderScreen(name);
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("show","anim"));
+  const el=document.getElementById(SCREEN[name]);el.classList.add("show");
+  if(anim!==false){void el.offsetWidth;el.classList.add("anim");}
+  state.screen=name;
+}
+function go(name){navStack.push(state.screen);showScreen(name);}
+function back(){const p=navStack.pop()||"folders";showScreen(p);}
+
+/* ============ FOLDERS screen ============ */
+function renderFolders(){
   const live=store.notes.filter(n=>!n.trashed);
-  const nav=document.getElementById("nav");
-  const views=[{k:"all",ic:"📝",lbl:"All Notes",c:live.length},{k:"fav",ic:"⭐",lbl:"Favorites",c:live.filter(n=>n.fav).length},{k:"trash",ic:"🗑",lbl:"Recently Deleted",c:store.notes.filter(n=>n.trashed).length}];
-  let h="";
-  views.forEach(v=>h+=`<button class="nav-item ${state.view===v.k?"active":""}" data-view="${v.k}"><span class="ic">${v.ic}</span>${v.lbl}<span class="count">${v.c}</span></button>`);
-  h+=`<div class="nav-label">নোটবুক <button id="addNb" title="নতুন নোটবুক">+</button></div>`;
   const cnt=id=>live.filter(n=>descendants(id).includes(n.notebook)).length;
-  const renderNb=(parent,depth)=>{store.notebooks.filter(n=>n.parent===parent).forEach(nb=>{
-    h+=`<button class="nb-row ${state.view==="notebook"&&state.nb===nb.id?"active":""}" data-nb="${nb.id}" style="padding-left:${11+depth*16}px"><span class="swatch" style="background:${nb.color}"></span><span class="nm">${esc(nb.name)}</span><span class="count">${cnt(nb.id)}</span><span class="nb-edit" data-edit="${nb.id}">✎</span></button>`;
+  const quick=store.notebooks.find(n=>n.special===QUICK);
+  let h=`<div class="promo"><div class="pic">✦</div><div><div class="pt">NoteNest</div><div class="ps">All features unlocked · free & yours</div></div></div>`;
+  // Quick Notes
+  h+=`<div class="group"><div class="row big" data-open="quick"><div class="ricon sq" style="background:var(--accent);color:#000">⚡</div><div class="rname">Quick Notes</div><span class="rval">${live.filter(n=>n.notebook===QUICK).length}</span><span class="chev">›</span></div></div>`;
+  // All folders
+  const tops=store.notebooks.filter(n=>!n.special&&n.parent==null);
+  h+=`<div class="sec-label">All Folders</div><div class="group">`;
+  const renderNb=(parent,depth)=>{store.notebooks.filter(n=>!n.special&&n.parent===parent).forEach(nb=>{
+    h+=`<div class="row" data-folder="${nb.id}" style="padding-left:${16+depth*18}px"><div class="ricon">${folderIcon(nb.color)}</div><div class="rname">${esc(nb.name)}</div><span class="rval">${cnt(nb.id)}</span><span class="chev">${state.editFolders?"✎":"›"}</span></div>`;
     renderNb(nb.id,depth+1);
   });};
   renderNb(null,0);
+  if(!tops.length)h+=`<div class="row" style="color:var(--muted)"><div class="ricon">📁</div><div class="rname">No folders yet — tap 🗂 to add</div></div>`;
+  h+=`</div>`;
+  // special
+  h+=`<div class="group">
+    <div class="row" data-open="pinned"><div class="ricon sq" style="background:#2c2c2e">📌</div><div class="rname">Pinned</div><span class="rval">${live.filter(n=>n.pinned).length}</span><span class="chev">›</span></div>
+    <div class="row" data-open="trash"><div class="ricon sq" style="background:#2c2c2e">🗑</div><div class="rname">Recently Deleted</div><span class="rval">${store.notes.filter(n=>n.trashed).length}</span><span class="chev">›</span></div>
+    <div class="row" data-open="settings"><div class="ricon sq" style="background:#2c2c2e">⚙️</div><div class="rname">Settings</div><span class="chev">›</span></div>
+  </div>`;
+  // tags
   const tags=allTags();
-  if(tags.length){h+=`<div class="nav-label">ট্যাগ</div><div style="padding:0 8px">`;tags.forEach(t=>h+=`<button class="tag-chip ${state.view==="tag"&&state.tag===t?"active":""}" data-tag="${esc(t)}">#${esc(t)}</button>`);h+=`</div>`;}
-  nav.innerHTML=h;
-  nav.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{state.view=b.dataset.view;state.nb=null;state.tag=null;exitSel();renderAll();});
-  nav.querySelectorAll("[data-nb]").forEach(b=>b.onclick=e=>{if(e.target.dataset.edit)return;state.view="notebook";state.nb=b.dataset.nb;state.tag=null;exitSel();renderAll();});
-  nav.querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();openNbModal(nbById(b.dataset.edit));});
-  nav.querySelectorAll("[data-tag]").forEach(b=>b.onclick=()=>{state.view="tag";state.tag=b.dataset.tag;state.nb=null;exitSel();renderAll();});
-  const a=document.getElementById("addNb");if(a)a.onclick=()=>openNbModal();
+  if(tags.length){h+=`<div class="sec-label">Tags</div><div style="padding:0 16px 20px;display:flex;flex-wrap:wrap;gap:8px">`+tags.map(t=>`<button class="hbtn pill" data-tag="${esc(t)}" style="background:var(--card);color:var(--accent)">#${esc(t)}</button>`).join("")+`</div>`;}
+  const body=document.getElementById("foldersBody");body.innerHTML=h;
+  body.querySelectorAll("[data-open]").forEach(r=>r.onclick=()=>{const v=r.dataset.open;if(v==="settings"){go("settings");return;}state.view=v;state.nb=null;state.query="";exitSel();go("list");});
+  body.querySelectorAll("[data-folder]").forEach(r=>r.onclick=()=>{const id=r.dataset.folder;if(state.editFolders){openFolderSheet(nbById(id));return;}state.view="folder";state.nb=id;state.query="";exitSel();go("list");});
+  body.querySelectorAll("[data-tag]").forEach(r=>r.onclick=()=>{state.view="tag";state.nb=r.dataset.tag;state.query="";exitSel();go("list");});
 }
+document.getElementById("fAddFolder").onclick=()=>openFolderSheet(null);
+document.getElementById("lAddFolder").onclick=()=>openFolderSheet(null,state.view==="folder"?state.nb:null);
+document.getElementById("fEdit").onclick=()=>{state.editFolders=!state.editFolders;document.getElementById("fEdit").textContent=state.editFolders?"Done":"Edit";renderFolders();};
+document.getElementById("fCompose").onclick=()=>newNote(QUICK);
+document.getElementById("fSearch").onclick=()=>{state.view="search";state.nb=null;state.query="";exitSel();go("list");setTimeout(()=>document.getElementById("lSearch").focus(),100);};
 
-/* ---------- list ---------- */
+/* ============ LIST screen ============ */
+function listTitle(){return{quick:"Quick Notes",pinned:"Pinned",trash:"Recently Deleted",search:"Search",folder:state.nb?(nbById(state.nb)||{}).name:"Notes",tag:"#"+state.nb}[state.view]||"Notes";}
 function renderList(){
-  const titles={all:"All Notes",fav:"Favorites",trash:"Recently Deleted",notebook:state.nb?(nbById(state.nb)||{}).name:"",tag:"#"+state.tag};
-  document.getElementById("listTitle").textContent=titles[state.view]||"Notes";
-  document.getElementById("listPane").classList.toggle("selmode",state.selMode);
-  const box=document.getElementById("notes");
+  document.getElementById("lTitle").textContent=listTitle();
+  document.getElementById("scrList").classList.toggle("selmode",state.selMode);
+  document.getElementById("lSelBar").classList.toggle("hidden",!state.selMode);
+  const ls=document.getElementById("lSearch");if(ls.value!==state.query)ls.value=state.query;
+  const body=document.getElementById("listBody");
+  let h="";
+  // subfolders at top when viewing a folder
+  if(state.view==="folder"&&state.nb){const subs=store.notebooks.filter(n=>n.parent===state.nb);
+    if(subs.length){h+=`<div class="group" style="margin-top:4px">`+subs.map(nb=>`<div class="row" data-sub="${nb.id}"><div class="ricon">${folderIcon(nb.color)}</div><div class="rname">${esc(nb.name)}</div><span class="rval">${store.notes.filter(n=>!n.trashed&&descendants(nb.id).includes(n.notebook)).length}</span><span class="chev">›</span></div>`).join("")+`</div>`;}
+  }
   const ns=filtered();
-  if(!ns.length){box.innerHTML=`<div class="empty"><div class="big">${state.query?"🔍":"📭"}</div>${state.query?"কিছু পাওয়া যায়নি":(state.view==="trash"?"ট্র্যাশ খালি":"কোনো নোট নেই")}</div>`;return;}
-  box.innerHTML=ns.map(n=>{
-    const nb=nbById(n.notebook);const tg=noteTags(n);
-    const prev=n.locked?"🔒 লক করা নোট":(esc(plain(n.body).slice(0,120))||"<span style='opacity:.6'>খালি নোট</span>");
-    return `<div class="note-card ${n.id===state.activeId?"active":""}" data-id="${n.id}">
-      <div class="nc-check ${state.sel.has(n.id)?"on":""}">✓</div>
-      <div class="nc-body">
-        <div class="nc-top">${n.pinned&&state.view!=="trash"?'<span class="pin">📌</span>':""}<span class="nc-title">${esc(n.title||"শিরোনামহীন")}</span>${n.fav?'<span style="color:var(--accent)">★</span>':""}</div>
-        <div class="nc-preview">${prev}</div>
-        <div class="nc-meta">${nb?`<span class="chip"><span class="dot" style="background:${nb.color}"></span>${esc(nb.name)}</span>·`:""}<span>${fmtDate(n.updated)}</span>${n.remindAt?`<span class="chip">⏰ ${fmtDT(n.remindAt)}</span>`:""}${n.attachments.length?`<span class="chip">📎 ${n.attachments.length}</span>`:""}</div>
-        ${tg.length&&!n.locked?`<div class="nc-tags">${tg.slice(0,5).map(t=>`<span>#${esc(t)}</span>`).join("")}</div>`:""}
-      </div></div>`;
-  }).join("");
-  box.querySelectorAll(".note-card").forEach(c=>c.onclick=()=>{
-    if(state.selMode){const id=c.dataset.id;if(state.sel.has(id))state.sel.delete(id);else state.sel.add(id);renderList();}
-    else openNote(c.dataset.id);
-  });
+  if(!ns.length&&!h){h=`<div class="empty"><div class="big">${state.query?"🔍":"📭"}</div>${state.query?"No matches":(state.view==="trash"?"Trash is empty":"No notes yet")}</div>`;}
+  else if(ns.length){
+    h+=`<div class="group" style="margin-top:4px">`+ns.map(n=>{
+      const thumb=firstImage(n),tg=noteTags(n),nb=nbById(n.notebook);
+      return `<div class="notecard" data-id="${n.id}">
+        <div class="nc-check ${state.sel.has(n.id)?"on":""}">✓</div>
+        <div class="nc-main">
+          <div class="nc-title">${n.pinned&&state.view!=="trash"?'<span style="color:var(--accent);font-size:13px">📌</span>':""}${n.locked?'🔒 ':''}<span class="t">${esc(noteTitle(n))}</span></div>
+          <div class="nc-sub">${n.locked?"Locked note":(esc(plain(n.body).slice(0,110))||"No additional text")}</div>
+          <div class="nc-meta"><span>${fmtDate(n.updated)}</span>${nb&&state.view!=="folder"&&nb.special!==QUICK?`<span class="mchip">${folderIconSmall(nb.color)} ${esc(nb.name)}</span>`:""}${n.remindAt?`<span class="mchip">⏰ ${fmtDT(n.remindAt)}</span>`:""}${tg.length&&!n.locked?`<span class="mchip" style="color:var(--accent)">#${esc(tg[0])}${tg.length>1?" +"+(tg.length-1):""}</span>`:""}</div>
+        </div>
+        ${thumb&&!n.locked?`<img class="nc-thumb" src="${thumb}">`:""}
+      </div>`;
+    }).join("")+`</div>`;
+  }
+  body.innerHTML=h;
+  body.querySelectorAll("[data-sub]").forEach(r=>r.onclick=()=>{state.nb=r.dataset.sub;state.query="";renderList();body.scrollTop=0;});
+  body.querySelectorAll(".notecard").forEach(c=>c.onclick=()=>{if(state.selMode){const id=c.dataset.id;state.sel.has(id)?state.sel.delete(id):state.sel.add(id);renderList();}else openNote(c.dataset.id);});
 }
+function folderIconSmall(c){return '<svg width="13" height="13" viewBox="0 0 24 24" style="vertical-align:-1px"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v7A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5v-9Z" fill="'+c+'"/></svg>';}
+document.getElementById("lBack").onclick=()=>{if(state.selMode){exitSel();renderList();return;}back();};
+document.getElementById("lCompose").onclick=()=>newNote(state.view==="folder"?state.nb:(state.view==="tag"?QUICK:(state.view==="quick"?QUICK:QUICK)),state.view==="tag"?[state.nb]:[]);
+document.getElementById("lSearch").addEventListener("input",e=>{state.query=e.target.value;if(state.view!=="search"&&!["quick","folder","pinned","trash","tag"].includes(state.view))state.view="search";renderList();});
+document.getElementById("lSelect").onclick=()=>{state.selMode=!state.selMode;state.sel.clear();renderList();};
+document.getElementById("lCancelSel").onclick=()=>{exitSel();renderList();};
+function exitSel(){state.selMode=false;state.sel.clear();}
+document.getElementById("lDelete").onclick=()=>{if(!state.sel.size)return;const ids=new Set(state.sel);store.notes.forEach(n=>{if(ids.has(n.id)){if(n.trashed){/*perm*/}else{n.trashed=true;n.pinned=false;n.deletedAt=Date.now();}}});if(state.view==="trash")store.notes=store.notes.filter(n=>!ids.has(n.id));save();exitSel();renderList();toast("Moved to Trash");};
+document.getElementById("lExport").onclick=()=>{if(!state.sel.size)return;exportNotes(store.notes.filter(n=>state.sel.has(n.id)));exitSel();renderList();};
 
-/* ---------- editor ---------- */
-function openNote(id){state.activeId=id;state.preview=false;renderList();renderEditor();if(window.innerWidth<=900)document.getElementById("editorPane").classList.add("open");}
+/* ============ EDITOR ============ */
+function newNote(nbid,tags){
+  const n={id:uid(),title:"",body:"",notebook:nbid||QUICK,tags:tags||[],pinned:false,trashed:false,color:"",locked:false,remindAt:null,attachments:[],created:Date.now(),updated:Date.now()};
+  store.notes.unshift(n);save();openNote(n.id);setTimeout(()=>document.getElementById(store.settings.notesStart==="body"?"eBody":"eTitle").focus(),120);
+}
+function openNote(id){state.activeId=id;go("editor");}
+let edPreview=false;
 function renderEditor(){
-  const n=activeNote();
-  const ec=document.getElementById("edContent"),ee=document.getElementById("edEmpty"),el=document.getElementById("edLocked");
-  ec.style.display="none";ee.style.display="none";el.style.display="none";
-  if(!n){ee.style.display="flex";return;}
-  if(n.locked&&!state.unlocked.has(n.id)){el.style.display="flex";return;}
-  ec.style.display="flex";
-  document.getElementById("edTitle").value=n.title||"";
-  document.getElementById("edBody").value=n.body||"";
-  document.getElementById("edDate").textContent="সম্পাদিত "+fmtDate(n.updated);
-  document.getElementById("nbSelect").innerHTML=store.notebooks.map(nb=>`<option value="${nb.id}" ${nb.id===n.notebook?"selected":""}>${esc(nb.name)}</option>`).join("");
-  document.getElementById("pinBtn").classList.toggle("on",!!n.pinned);
-  document.getElementById("favBtn").classList.toggle("on",!!n.fav);document.getElementById("favBtn").textContent=n.fav?"★":"☆";
-  document.getElementById("lockBtn").classList.toggle("on",!!n.locked);document.getElementById("lockBtn").textContent=n.locked?"🔒":"🔓";
-  const rm=document.getElementById("rmChip");if(n.remindAt){rm.style.display="flex";rm.innerHTML=`⏰ ${fmtDT(n.remindAt)} <button data-rm>×</button>`;rm.querySelector("[data-rm]").onclick=()=>{n.remindAt=null;touch(n);renderEditor();renderList();};}else rm.style.display="none";
-  document.getElementById("edInner").style.background=noteBg(n);
-  renderTags(n);renderAttachments(n);togglePreview(state.preview,true);updateCounts();
+  const n=activeNote();if(!n){back();return;}
+  if(n.locked&&!state.unlocked.has(n.id)){
+    askPasscode("Enter note password",v=>{if(v===store.settings.noteLock){state.unlocked.add(n.id);renderEditor();}else{toast("Wrong password");back();}},true);
+    return;
+  }
+  edPreview=false;
+  const titleEl=document.getElementById("eTitle");
+  titleEl.style.display=store.settings.notesStart==="body"?"none":"block";
+  titleEl.value=n.title||"";
+  document.getElementById("eBody").value=n.body||"";
+  document.getElementById("eBody").style.display="block";document.getElementById("ePrev").style.display="none";
+  document.getElementById("ePreview").classList.remove("on");
+  const nbs=store.notebooks.map(nb=>`<option value="${nb.id}" ${nb.id===n.notebook?"selected":""}>${nb.special===QUICK?"Quick Notes":esc(nb.name)}</option>`).join("");
+  document.getElementById("eMeta").innerHTML=`<div class="mb">📁 <select id="eNb">${nbs}</select></div><span>${fmtDate(n.updated)}</span>${n.remindAt?`<span class="mb" style="color:var(--accent)">⏰ ${fmtDT(n.remindAt)}</span>`:""}${n.color?`<span class="mb">🎨</span>`:""}`;
+  document.getElementById("eNb").onchange=e=>{n.notebook=e.target.value;n.updated=Date.now();save();};
+  document.getElementById("ed-inner-bg");
+  document.querySelector("#scrEditor").style.background=n.color?noteBg(n):"var(--bg)";
+  renderTags(n);renderAtt(n);updWords();document.getElementById("eSaved").textContent="Saved";
 }
-function noteBg(n){if(!n.color)return"";const i=NOTECOLORS.indexOf(n.color);if(i>0)return isDark()?NOTECOLORS_DARK[i]:NOTECOLORS[i];return n.color;}
+function noteBg(n){const i=NOTECOLORS.indexOf(n.color);return i>0?NOTECOLORS[i]:(n.color||"var(--bg)");}
 function renderTags(n){
-  const box=document.getElementById("tagEdit");
-  const manual=n.tags||[];const auto=autoTags(n.body).filter(t=>!manual.includes(t));
-  box.innerHTML=manual.map(t=>`<span class="t">#${esc(t)}<button data-t="${esc(t)}">×</button></span>`).join("")
-    +auto.map(t=>`<span class="t" style="opacity:.7">#${esc(t)}</span>`).join("")
-    +`<input id="tagInput" placeholder="+ ট্যাগ">`;
-  box.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{n.tags=n.tags.filter(x=>x!==b.dataset.t);touch(n);renderTags(n);renderNav();});
-  const inp=document.getElementById("tagInput");
-  inp.onkeydown=e=>{if(e.key==="Enter"||e.key===","){e.preventDefault();const v=inp.value.trim().replace(/^#/,"");if(v&&!(n.tags||[]).includes(v)){n.tags=n.tags||[];n.tags.push(v);touch(n);renderTags(n);renderNav();document.getElementById("tagInput").focus();}}};
+  const box=document.getElementById("eTags");const man=n.tags||[];const au=autoTags(n.body).filter(t=>!man.includes(t));
+  box.innerHTML=man.map(t=>`<span class="tg">#${esc(t)}<button data-t="${esc(t)}">×</button></span>`).join("")+au.map(t=>`<span class="tg auto">#${esc(t)}</span>`).join("")+`<input id="eTagIn" placeholder="+ tag">`;
+  box.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{n.tags=n.tags.filter(x=>x!==b.dataset.t);n.updated=Date.now();save();renderTags(n);});
+  const inp=document.getElementById("eTagIn");
+  inp.onkeydown=e=>{if(e.key==="Enter"||e.key===","){e.preventDefault();const v=inp.value.trim().replace(/^#/,"");if(v&&!(n.tags||[]).includes(v)){n.tags=n.tags||[];n.tags.push(v);n.updated=Date.now();save();renderTags(n);document.getElementById("eTagIn").focus();}}};
 }
-function renderAttachments(n){
-  const box=document.getElementById("attachments");
-  if(!n.attachments.length){box.innerHTML="";return;}
-  box.innerHTML=n.attachments.map((a,i)=>`<div class="att"><img src="${a.data}" alt="${esc(a.name||"")}"><button class="del" data-i="${i}">×</button></div>`).join("");
-  box.querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{n.attachments.splice(+b.dataset.i,1);touch(n);renderAttachments(n);renderList();});
+function renderAtt(n){
+  const box=document.getElementById("eAtt");
+  box.innerHTML=(n.attachments||[]).map((a,i)=>`<div class="a"><img src="${a.data}"><button class="x" data-i="${i}">×</button></div>`).join("");
+  box.querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>{n.attachments.splice(+b.dataset.i,1);n.updated=Date.now();save();renderAtt(n);});
 }
-function togglePreview(on){
-  state.preview=on;const body=document.getElementById("edBody"),prev=document.getElementById("edPreview");
-  document.getElementById("previewBtn").classList.toggle("on",on);
-  if(on){prev.innerHTML=renderMD(body.value);prev.style.display="block";body.style.display="none";}
-  else{prev.style.display="none";body.style.display="block";}
-}
-function updateCounts(){const t=document.getElementById("edBody").value;const w=t.trim()?t.trim().split(/\s+/).length:0;document.getElementById("wordCount").textContent=w+" words";document.getElementById("charCount").textContent=t.length+" chars";}
-function touch(n){n.updated=Date.now();save();}
-function flagSaving(){document.getElementById("savedTxt").textContent="Saving…";clearTimeout(saveTimer);saveTimer=setTimeout(()=>{save();document.getElementById("savedTxt").textContent="Saved";renderList();renderNav();},500);}
+function updWords(){const t=document.getElementById("eBody").value;const w=t.trim()?t.trim().split(/\s+/).length:0;document.getElementById("eWords").textContent=w+" words · "+t.length+" chars";}
+let edSaveTimer=null;
+function edChanged(){const n=activeNote();if(!n)return;n.title=document.getElementById("eTitle").value;n.body=document.getElementById("eBody").value;n.updated=Date.now();updWords();document.getElementById("eSaved").textContent="Saving…";clearTimeout(edSaveTimer);edSaveTimer=setTimeout(()=>{save();document.getElementById("eSaved").textContent="Saved";},400);}
+document.getElementById("eTitle").addEventListener("input",edChanged);
+document.getElementById("eBody").addEventListener("input",()=>{const n=activeNote();edChanged();if(n)renderTags(n);});
+document.getElementById("eBack").onclick=()=>{save();back();};
+document.getElementById("ePreview").onclick=()=>{edPreview=!edPreview;const b=document.getElementById("eBody"),p=document.getElementById("ePrev");document.getElementById("ePreview").classList.toggle("on",edPreview);if(edPreview){p.innerHTML=renderMD(b.value);p.style.display="block";b.style.display="none";}else{p.style.display="none";b.style.display="block";}};
 
-document.getElementById("edTitle").addEventListener("input",e=>{const n=activeNote();if(!n)return;n.title=e.target.value;n.updated=Date.now();flagSaving();});
-document.getElementById("edBody").addEventListener("input",e=>{const n=activeNote();if(!n)return;n.body=e.target.value;n.updated=Date.now();updateCounts();flagSaving();});
-document.getElementById("nbSelect").addEventListener("change",e=>{const n=activeNote();if(!n)return;n.notebook=e.target.value;touch(n);renderList();renderNav();});
-
-/* markdown toolbar */
-document.getElementById("mdTools").addEventListener("click",e=>{
-  const b=e.target.closest("[data-md]");if(!b)return;const ta=document.getElementById("edBody");const s=ta.selectionStart,en=ta.selectionEnd,txt=ta.value,sel=txt.slice(s,en);
-  const wrap=(p,q="")=>{ta.value=txt.slice(0,s)+p+sel+q+txt.slice(en);ta.focus();ta.selectionStart=s+p.length;ta.selectionEnd=s+p.length+sel.length;};
+document.getElementById("eTool").addEventListener("click",e=>{
+  const b=e.target.closest("[data-md]");if(!b)return;const ta=document.getElementById("eBody");const s=ta.selectionStart,en=ta.selectionEnd,txt=ta.value,sel=txt.slice(s,en);
+  const wrap=(p,q)=>{ta.value=txt.slice(0,s)+p+sel+q+txt.slice(en);ta.focus();ta.selectionStart=s+p.length;ta.selectionEnd=s+p.length+sel.length;};
   const line=p=>{const ls=txt.lastIndexOf("\n",s-1)+1;ta.value=txt.slice(0,ls)+p+txt.slice(ls);ta.focus();ta.selectionStart=ta.selectionEnd=en+p.length;};
-  ({h:()=>line("## "),b:()=>wrap("**","**"),i:()=>wrap("*","*"),ul:()=>line("- "),chk:()=>line("- [ ] "),code:()=>wrap("`","`"),quote:()=>line("> "),link:()=>wrap("[","](url)")})[b.dataset.md]();
-  const n=activeNote();if(n){n.body=ta.value;n.updated=Date.now();updateCounts();flagSaving();}
+  const ins=t=>{ta.value=txt.slice(0,s)+t+txt.slice(en);ta.focus();ta.selectionStart=ta.selectionEnd=s+t.length;};
+  ({h1:()=>line("# "),h2:()=>line("## "),b:()=>wrap("**","**"),i:()=>wrap("*","*"),ul:()=>line("- "),ol:()=>line("1. "),chk:()=>line("- [ ] "),quote:()=>line("> "),code:()=>wrap("`","`"),link:()=>wrap("[","](url)"),table:()=>ins("\n| A | B |\n| --- | --- |\n| 1 | 2 |\n")})[b.dataset.md]();
+  edChanged();
 });
 
-/* new note */
-document.getElementById("newBtn").onclick=()=>{
-  const nb=state.view==="notebook"&&state.nb?state.nb:store.notebooks[0].id;
-  const n={id:uid(),title:"",body:"",notebook:nb,tags:state.view==="tag"&&state.tag?[state.tag]:[],pinned:false,fav:false,trashed:false,color:"",locked:false,remindAt:null,attachments:[],created:Date.now(),updated:Date.now()};
-  store.notes.unshift(n);save();if(state.view==="fav"||state.view==="trash")state.view="all";
-  openNote(n.id);renderNav();setTimeout(()=>document.getElementById("edTitle").focus(),50);
-};
-document.getElementById("pinBtn").onclick=()=>{const n=activeNote();if(!n)return;n.pinned=!n.pinned;touch(n);renderEditor();renderList();};
-document.getElementById("favBtn").onclick=()=>{const n=activeNote();if(!n)return;n.fav=!n.fav;touch(n);renderEditor();renderList();renderNav();};
-document.getElementById("previewBtn").onclick=()=>togglePreview(!state.preview);
-
-/* export single */
-document.getElementById("dlBtn").onclick=()=>{const n=activeNote();if(!n)return;exportNotes([n]);};
-document.getElementById("delBtn").onclick=()=>{
-  const n=activeNote();if(!n)return;
-  if(n.trashed)askConfirm("স্থায়ীভাবে মুছবেন?","এই নোট আর ফিরে পাবেন না।",()=>{store.notes=store.notes.filter(x=>x.id!==n.id);state.activeId=null;save();renderAll();});
-  else{n.trashed=true;n.pinned=false;n.deletedAt=Date.now();touch(n);state.activeId=null;renderAll();toast("ট্র্যাশে সরানো হয়েছে");}
-};
-
-/* lock a note */
-document.getElementById("lockBtn").onclick=()=>{
-  const n=activeNote();if(!n)return;
-  if(n.locked){n.locked=false;touch(n);renderEditor();renderList();toast("আনলক করা হয়েছে");return;}
-  if(!store.settings.noteLock){toast("আগে Settings-এ Note Lock চালু করুন");openSettings();return;}
-  n.locked=true;touch(n);renderEditor();renderList();toast("🔒 নোট লক হয়েছে");
-};
-document.getElementById("unlockNote").onclick=()=>{
-  const n=activeNote();if(!n)return;
-  askPasscode("পাসওয়ার্ড দিন",v=>{if(v===store.settings.noteLock){state.unlocked.add(n.id);renderEditor();}else toast("ভুল পাসওয়ার্ড");},true);
-};
-
-/* voice to text */
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-document.getElementById("voiceBtn").onclick=()=>{
-  const n=activeNote();if(!n)return;
-  if(!SR){toast("এই ব্রাউজারে ভয়েস সাপোর্ট নেই");return;}
+/* voice */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let recog=null,recording=false;
+document.getElementById("eVoice").onclick=()=>{const n=activeNote();if(!n)return;if(!SR){toast("Voice not supported here");return;}
   if(recording){recog.stop();return;}
-  recog=new SR();recog.lang="bn-BD";recog.continuous=true;recog.interimResults=true;
-  const ta=document.getElementById("edBody");let base=ta.value;
-  recog.onresult=e=>{let fin="",int="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t;else int+=t;}
-    if(fin){base=base+(base&&!base.endsWith("\n")?" ":"")+fin;}
-    ta.value=base+(int?" "+int:"");n.body=ta.value;updateCounts();};
-  recog.onend=()=>{recording=false;document.getElementById("voiceBtn").classList.remove("rec");n.body=ta.value;touch(n);renderList();};
-  recog.onerror=()=>{toast("ভয়েস শোনা যায়নি");};
-  recog.start();recording=true;document.getElementById("voiceBtn").classList.add("rec");toast("🎤 বলুন... (থামাতে আবার চাপুন)");
+  recog=new SR();recog.lang="en-US";recog.continuous=true;recog.interimResults=true;
+  const ta=document.getElementById("eBody");let base=ta.value;
+  recog.onresult=e=>{let fin="",int="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t;else int+=t;}if(fin)base=base+(base&&!base.endsWith("\n")?" ":"")+fin;ta.value=base+(int?" "+int:"");n.body=ta.value;updWords();};
+  recog.onend=()=>{recording=false;document.getElementById("eVoice").classList.remove("rec");edChanged();};
+  recog.onerror=()=>toast("Didn't catch that");
+  recog.start();recording=true;document.getElementById("eVoice").classList.add("rec");toast("🎤 Listening… tap mic to stop");
 };
+/* image (with downscale) */
+document.getElementById("eImg").onclick=()=>document.getElementById("eImgFile").click();
+document.getElementById("eImgFile").onchange=e=>{const n=activeNote();if(!n)return;[...e.target.files].forEach(f=>downscale(f,data=>{n.attachments.push({type:"image",name:f.name,data});n.updated=Date.now();save();renderAtt(n);}));e.target.value="";};
+function downscale(file,cb){const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const max=1600;let{width:w,height:h}=img;if(w>max||h>max){const s=Math.min(max/w,max/h);w=Math.round(w*s);h=Math.round(h*s);}const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);try{cb(c.toDataURL("image/jpeg",0.82));}catch(err){cb(r.result);}};img.onerror=()=>cb(r.result);img.src=r.result;};r.readAsDataURL(file);}
 
-/* image attach */
-document.getElementById("imgBtn").onclick=()=>document.getElementById("imgFile").click();
-document.getElementById("imgFile").onchange=e=>{
-  const n=activeNote();if(!n)return;const files=[...e.target.files];
-  files.forEach(f=>{if(f.size>2.5*1024*1024){toast("ছবি বড় (2.5MB+) — স্কিপ");return;}const r=new FileReader();r.onload=()=>{n.attachments.push({type:"image",name:f.name,data:r.result});touch(n);renderAttachments(n);renderList();};r.readAsDataURL(f);});
-  e.target.value="";
+/* editor ⋯ menu */
+document.getElementById("eMenu").onclick=()=>{const n=activeNote();if(!n)return;
+  const opts=[
+    {ic:n.pinned?"📌":"📍",label:n.pinned?"Unpin":"Pin",fn:()=>{n.pinned=!n.pinned;n.updated=Date.now();save();toast(n.pinned?"Pinned":"Unpinned");}},
+    {ic:"🎨",label:"Color",fn:()=>openColorSheet(n)},
+    {ic:"⏰",label:n.remindAt?"Edit reminder":"Add reminder",fn:()=>openReminderSheet(n)},
+    {ic:n.locked?"🔓":"🔒",label:n.locked?"Unlock note":"Lock note",fn:()=>toggleLock(n)},
+    {ic:"⬇",label:"Export (.md)",fn:()=>exportNotes([n])},
+    {ic:"🗑",label:n.trashed?"Delete permanently":"Move to Trash",danger:true,fn:()=>{if(n.trashed){store.notes=store.notes.filter(x=>x.id!==n.id);state.activeId=null;save();back();toast("Deleted");}else{n.trashed=true;n.pinned=false;n.deletedAt=Date.now();save();state.activeId=null;back();toast("Moved to Trash");}}}
+  ];
+  openSheet(`<div class="grab"></div><h3>${esc(noteTitle(n))}</h3>`+opts.map((o,i)=>`<div class="srow ${o.danger?"danger":""}" data-i="${i}"><span class="ic">${o.ic}</span>${o.label}</div>`).join(""));
+  document.querySelectorAll("#sheet .srow").forEach((r,i)=>r.onclick=()=>{closeSheet();opts[i].fn();if(state.screen==="editor")renderEditor();});
 };
+function toggleLock(n){if(n.locked){n.locked=false;n.updated=Date.now();save();toast("Unlocked");return;}if(!store.settings.noteLock){toast("Set a Note Lock password in Settings first");go("settings");return;}n.locked=true;n.updated=Date.now();save();toast("🔒 Locked");}
 
-/* reminder */
-let rmNote=null;
-document.getElementById("remindBtn").onclick=()=>{const n=activeNote();if(!n)return;rmNote=n;const inp=document.getElementById("rmInput");inp.value=n.remindAt?new Date(n.remindAt-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):"";document.getElementById("rmModal").classList.add("show");};
-document.getElementById("rmCancel").onclick=()=>document.getElementById("rmModal").classList.remove("show");
-document.getElementById("rmRemove").onclick=()=>{if(rmNote){rmNote.remindAt=null;touch(rmNote);renderEditor();renderList();}document.getElementById("rmModal").classList.remove("show");};
-document.getElementById("rmSave").onclick=()=>{const v=document.getElementById("rmInput").value;if(!v||!rmNote)return;rmNote.remindAt=new Date(v).getTime();touch(rmNote);scheduleReminders();renderEditor();renderList();document.getElementById("rmModal").classList.remove("show");if(Notification&&Notification.permission==="default")Notification.requestPermission();toast("⏰ রিমাইন্ডার সেট");};
+/* ============ sheets ============ */
+function openSheet(html){document.getElementById("sheet").innerHTML=html;document.getElementById("sheetBg").classList.add("show");return document.getElementById("sheet");}
+function closeSheet(){document.getElementById("sheetBg").classList.remove("show");}
+document.getElementById("sheetBg").addEventListener("click",e=>{if(e.target.id==="sheetBg")closeSheet();});
 
-let rmTimers=[];
-function scheduleReminders(){
-  rmTimers.forEach(t=>clearTimeout(t));rmTimers=[];
-  store.notes.filter(n=>!n.trashed&&n.remindAt&&n.remindAt>Date.now()).forEach(n=>{
-    const d=n.remindAt-Date.now();if(d<2147483647)rmTimers.push(setTimeout(()=>fireReminder(n),d));
-  });
+function openColorSheet(n){
+  openSheet(`<div class="grab"></div><h3>Note color</h3><div class="swrow">`+NOTECOLORS.map((c,i)=>`<button data-c="${c}" class="${n.color===c?"sel":""}" style="background:${c||"transparent"};border:2px ${c?"solid "+(n.color===c?"#fff":"transparent"):"dashed var(--muted2)"}">${c?"":"✕"}</button>`).join("")+`</div>`);
+  document.querySelectorAll("#sheet [data-c]").forEach(b=>b.onclick=()=>{n.color=b.dataset.c;n.updated=Date.now();save();closeSheet();renderEditor();});
 }
-function fireReminder(n){
-  if(Notification&&Notification.permission==="granted")try{new Notification("⏰ NoteNest রিমাইন্ডার",{body:n.title||plain(n.body).slice(0,60)});}catch(e){}
-  toast("⏰ রিমাইন্ডার: "+(n.title||"নোট"));
+function openReminderSheet(n){
+  const cur=n.remindAt?new Date(n.remindAt-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):"";
+  openSheet(`<div class="grab"></div><h3>Reminder</h3><div class="field-label">Date & time</div><input type="datetime-local" id="rmIn" value="${cur}"><button class="sbtn" id="rmSet">Set reminder</button>${n.remindAt?'<button class="sbtn dngr" id="rmDel">Remove reminder</button>':""}`);
+  document.getElementById("rmSet").onclick=()=>{const v=document.getElementById("rmIn").value;if(!v)return;n.remindAt=new Date(v).getTime();n.updated=Date.now();save();scheduleReminders();if(window.Notification&&Notification.permission==="default")Notification.requestPermission();closeSheet();renderEditor();toast("⏰ Reminder set");};
+  const d=document.getElementById("rmDel");if(d)d.onclick=()=>{n.remindAt=null;n.updated=Date.now();save();closeSheet();renderEditor();};
 }
-
-/* color */
-let colNote=null;
-document.getElementById("colorBtn").onclick=()=>{const n=activeNote();if(!n)return;colNote=n;const sw=document.getElementById("colorSwatches");
-  sw.innerHTML=NOTECOLORS.map((c,i)=>`<button data-c="${c}" class="${n.color===c?"sel":""}" style="background:${c||"transparent"};border:2px ${c?"solid "+(n.color===c?"var(--text)":"transparent"):"dashed var(--border)"}">${c?"":"✕"}</button>`).join("");
-  sw.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{n.color=b.dataset.c;touch(n);renderEditor();renderList();document.getElementById("colorModal").classList.remove("show");});
-  document.getElementById("colorModal").classList.add("show");};
-document.getElementById("colorCancel").onclick=()=>document.getElementById("colorModal").classList.remove("show");
-
-/* select mode + bulk */
-document.getElementById("selBtn").onclick=()=>{state.selMode=!state.selMode;state.sel.clear();document.getElementById("selBar").style.display=state.selMode?"flex":"none";renderList();};
-function exitSel(){state.selMode=false;state.sel.clear();document.getElementById("selBar").style.display="none";}
-document.getElementById("selCancel").onclick=()=>{exitSel();renderList();};
-document.getElementById("selDelete").onclick=()=>{if(!state.sel.size)return;askConfirm(state.sel.size+"টি নোট ট্র্যাশে পাঠাবেন?","",()=>{store.notes.forEach(n=>{if(state.sel.has(n.id)){n.trashed=true;n.pinned=false;n.deletedAt=Date.now();}});save();exitSel();renderAll();});};
-document.getElementById("selExport").onclick=()=>{if(!state.sel.size)return;exportNotes(store.notes.filter(n=>state.sel.has(n.id)));};
-
-/* export (downloads capability + fallback) */
-let _dl=null,_dlTried=false;
-async function ensureDl(){if(_dlTried)return _dl;_dlTried=true;try{_dl=await claude.use("downloads");}catch(e){_dl=null;}return _dl;}
-async function doDownload(name,content,type){
-  const dl=await ensureDl();
-  if(dl){try{await dl.save({filename:name,data:content});return;}catch(e){if(e&&e.code==="declined")return;}}
-  try{const b=new Blob([content],{type});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}catch(e){toast("ডাউনলোড ব্যর্থ");}
-}
-function noteToMD(n){return"# "+(n.title||"Untitled")+"\n\n"+(n.body||"");}
-function exportNotes(notes){
-  if(notes.length===1){doDownload((notes[0].title||"note").replace(/[\/\\]/g,"-")+".md",noteToMD(notes[0]),"text/markdown");exitSel();renderList();return;}
-  const all=notes.map(noteToMD).join("\n\n---\n\n");
-  doDownload("notenest-export-"+new Date().toISOString().slice(0,10)+".md",all,"text/markdown");exitSel();renderList();
-}
-
-/* notebook modal */
-function openNbModal(edit){
-  nbEditing=edit||null;
-  document.getElementById("nbModalTitle").textContent=edit?"নোটবুক সম্পাদনা":"নতুন নোটবুক";
-  document.getElementById("nbName").value=edit?edit.name:"";
-  pendingSwatch=edit?edit.color:COLORS[0];
-  const sw=document.getElementById("nbSwatches");
-  sw.innerHTML=COLORS.map(c=>`<button data-c="${c}" style="background:${c}" class="${c===pendingSwatch?"sel":""}"></button>`).join("");
-  sw.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{pendingSwatch=b.dataset.c;sw.querySelectorAll("button").forEach(x=>x.classList.remove("sel"));b.classList.add("sel");});
-  const par=document.getElementById("nbParent");
+function openFolderSheet(edit,presetParent){
+  let color=edit?edit.color:COLORS[0];let parent=edit?edit.parent:(presetParent||null);
   const banned=edit?descendants(edit.id):[];
-  par.innerHTML=`<option value="">— কোনোটি নয় (টপ লেভেল) —</option>`+store.notebooks.filter(nb=>!banned.includes(nb.id)).map(nb=>`<option value="${nb.id}" ${edit&&edit.parent===nb.id?"selected":""}>${esc(nb.name)}</option>`).join("");
-  document.getElementById("nbDelete").style.display=edit?"block":"none";
-  document.getElementById("nbModal").classList.add("show");setTimeout(()=>document.getElementById("nbName").focus(),50);
+  const parentOpts=`<option value="">— None (top level) —</option>`+store.notebooks.filter(nb=>!nb.special&&!banned.includes(nb.id)).map(nb=>`<option value="${nb.id}" ${parent===nb.id?"selected":""}>${esc(nb.name)}</option>`).join("");
+  openSheet(`<div class="grab"></div><h3>${edit?"Edit folder":"New folder"}</h3>
+    <input type="text" id="fName" placeholder="Folder name" value="${edit?esc(edit.name):""}">
+    <div class="field-label">Color</div><div class="swrow" id="fColors">${COLORS.map(c=>`<button data-c="${c}" class="${c===color?"sel":""}" style="background:${c}"></button>`).join("")}</div>
+    <div class="field-label">Parent folder</div><select id="fParent" style="width:calc(100% - 44px);margin:0 22px 8px;padding:12px;border-radius:11px;background:var(--card2);border:none;outline:none;font-size:16px;color:var(--text)">${parentOpts}</select>
+    <button class="sbtn" id="fSave">Save</button>${edit?'<button class="sbtn dngr" id="fDel">Delete folder</button>':""}`);
+  document.querySelectorAll("#fColors [data-c]").forEach(b=>b.onclick=()=>{color=b.dataset.c;document.querySelectorAll("#fColors [data-c]").forEach(x=>x.classList.remove("sel"));b.classList.add("sel");});
+  document.getElementById("fSave").onclick=()=>{const name=document.getElementById("fName").value.trim();if(!name){toast("Enter a name");return;}const par=document.getElementById("fParent").value||null;if(edit){edit.name=name;edit.color=color;edit.parent=par;}else store.notebooks.push({id:uid(),name,color,parent:par});save();closeSheet();state.editFolders=false;document.getElementById("fEdit").textContent="Edit";if(state.screen==="list")renderList();showScreen("folders",false);};
+  const del=document.getElementById("fDel");if(del)del.onclick=()=>{const ids=descendants(edit.id);const fb=store.notebooks.find(nb=>!ids.includes(nb.id)&&nb.special!==QUICK)||store.notebooks.find(nb=>nb.special===QUICK);store.notes.forEach(n=>{if(ids.includes(n.notebook))n.notebook=fb.id;});store.notebooks=store.notebooks.filter(nb=>!ids.includes(nb.id));save();closeSheet();if(state.view==="folder"&&ids.includes(state.nb)){back();}showScreen("folders",false);toast("Folder deleted");};
 }
-document.getElementById("nbCancel").onclick=()=>document.getElementById("nbModal").classList.remove("show");
-document.getElementById("nbSave").onclick=()=>{
-  const name=document.getElementById("nbName").value.trim();if(!name)return;const parent=document.getElementById("nbParent").value||null;
-  if(nbEditing){nbEditing.name=name;nbEditing.color=pendingSwatch;nbEditing.parent=parent;}
-  else store.notebooks.push({id:uid(),name,color:pendingSwatch,parent});
-  save();document.getElementById("nbModal").classList.remove("show");renderAll();
-};
-document.getElementById("nbDelete").onclick=()=>{
-  if(!nbEditing)return;const ids=descendants(nbEditing.id);
-  askConfirm("নোটবুক মুছবেন?","ভেতরের নোটগুলো 'All Notes'-এ থাকবে, সাবফোল্ডারসহ মুছে যাবে।",()=>{
-    const fallback=store.notebooks.find(nb=>!ids.includes(nb.id));
-    store.notes.forEach(n=>{if(ids.includes(n.notebook))n.notebook=fallback?fallback.id:null;});
-    store.notebooks=store.notebooks.filter(nb=>!ids.includes(nb.id));
-    if(!store.notebooks.length)store.notebooks.push({id:uid(),name:"Notes",color:COLORS[0],parent:null});
-    if(state.nb&&ids.includes(state.nb)){state.view="all";state.nb=null;}
-    save();document.getElementById("nbModal").classList.remove("show");renderAll();
-  });
-};
 
-/* confirm */
-function askConfirm(title,sub,cb){document.getElementById("confirmTitle").textContent=title;document.getElementById("confirmSub").textContent=sub||"";confirmCb=cb;document.getElementById("confirmModal").classList.add("show");}
-document.getElementById("confirmCancel").onclick=()=>document.getElementById("confirmModal").classList.remove("show");
-document.getElementById("confirmOk").onclick=()=>{document.getElementById("confirmModal").classList.remove("show");if(confirmCb)confirmCb();};
-
-/* passcode input modal */
-function askPasscode(title,cb,isText){document.getElementById("pcTitle").textContent=title;pcCb=cb;const i=document.getElementById("pcInput");i.value="";i.type=isText?"text":"password";document.getElementById("pcErr").textContent="";document.getElementById("pcModal").classList.add("show");setTimeout(()=>i.focus(),50);}
-document.getElementById("pcCancel").onclick=()=>{document.getElementById("pcModal").classList.remove("show");pcCb=null;};
-document.getElementById("pcOk").onclick=()=>{const v=document.getElementById("pcInput").value;document.getElementById("pcModal").classList.remove("show");if(pcCb)pcCb(v);};
-document.getElementById("pcInput").onkeydown=e=>{if(e.key==="Enter")document.getElementById("pcOk").click();};
-
-/* settings */
-function openSettings(){
-  document.querySelectorAll("#themeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.t===store.settings.theme));
-  document.getElementById("fontSel").value=store.settings.font||document.getElementById("fontSel").options[0].value;
-  document.getElementById("fsRange").value=store.settings.fontSize;document.getElementById("fsVal").textContent=store.settings.fontSize;
-  document.getElementById("appLockToggle").classList.toggle("on",!!store.settings.appLock);
-  document.getElementById("noteLockToggle").classList.toggle("on",!!store.settings.noteLock);
-  document.getElementById("notifBtn").textContent=(window.Notification&&Notification.permission==="granted")?"✓ চালু":"চালু করুন";
-  const dc=document.getElementById("driveCid");if(dc)dc.value=store.settings.driveClientId||"";
-  if(typeof updateDriveStatus==="function")updateDriveStatus();
-  document.getElementById("setModal").classList.add("show");
+/* ============ SETTINGS ============ */
+function renderSettings(){
+  const s=store.settings;const sz=new Blob([JSON.stringify(store)]).size;
+  const row=(ic,name,val,id,bg)=>`<div class="row" data-s="${id}"><div class="ricon sq" style="background:${bg||"var(--card2)"}">${ic}</div><div class="rname">${name}</div>${val!==undefined?`<span class="rval">${val}</span>`:""}<span class="chev">›</span></div>`;
+  const toggleRow=(ic,name,sub,on,id,bg)=>`<div class="row" data-t="${id}"><div class="ricon sq" style="background:${bg||"var(--card2)"}">${ic}</div><div style="flex:1"><div class="rname" style="font-size:17px">${name}</div>${sub?`<div style="font-size:12.5px;color:var(--muted)">${sub}</div>`:""}</div><div class="toggle ${on?"on":""}"></div></div>`;
+  let h=`<div class="promo"><div class="pic">✦</div><div><div class="pt">All Premium Features</div><div class="ps">Unlocked — free, forever</div></div></div>`;
+  h+=`<div class="sec-label">Notes</div><div class="group">
+    ${row("↕️","Sort Notes By",{updated:"Date Edited",created:"Date Created",title:"Title"}[s.sortBy],"sort","#0a84ff")}
+    ${row("📝","Notes Start With",s.notesStart==="body"?"Body":"Title","start","#bf5af2")}
+  </div>`;
+  h+=`<div class="sec-label">Appearance</div><div class="group">
+    ${row("🎨","Theme",{dark:"Dark",light:"Light",auto:"Auto"}[s.theme],"theme","#ff9500")}
+    ${row("🔤","Font & Size",s.fontSize+"px","font","#ff375f")}
+  </div>`;
+  h+=`<div class="sec-label">Sync & Backup</div><div class="group">
+    ${row("☁️","Google Drive Sync",drive.connected?"On":"Off","sync","#30d158")}
+    ${row("💾","Backup & Restore",undefined,"backup","#0a84ff")}
+    ${row("📊","Storage",(sz/1024/1024).toFixed(2)+" MB","storage","#64d2ff")}
+  </div>`;
+  h+=`<div class="sec-label">Privacy</div><div class="group">
+    ${toggleRow("🔐","App Lock","Passcode to open the app",!!s.appLock,"applock","#0a84ff")}
+    ${toggleRow("🔒","Note Lock","Password to open locked notes",!!s.noteLock,"notelock","#bf5af2")}
+    ${row("🔔","Reminder Notifications",(window.Notification&&Notification.permission==="granted")?"On":"Off","notif","#ff9500")}
+  </div>`;
+  h+=`<div style="text-align:center;color:var(--muted2);font-size:12px;padding:10px 0 30px">NoteNest · ${store.notes.filter(n=>!n.trashed).length} notes · ${store.notebooks.filter(n=>!n.special).length} folders</div>`;
+  const body=document.getElementById("settingsBody");body.innerHTML=h;
+  body.querySelectorAll("[data-s]").forEach(r=>r.onclick=()=>settingsAction(r.dataset.s));
+  body.querySelectorAll("[data-t]").forEach(r=>r.onclick=()=>settingsToggle(r.dataset.t));
 }
-document.getElementById("setBtn").onclick=openSettings;
-document.getElementById("setClose").onclick=()=>document.getElementById("setModal").classList.remove("show");
-document.getElementById("themeSeg").onclick=e=>{const b=e.target.closest("[data-t]");if(!b)return;store.settings.theme=b.dataset.t;save();applyTheme();openSettings();};
-document.getElementById("fontSel").onchange=e=>{store.settings.font=e.target.value;save();applyTheme();};
-document.getElementById("fsRange").oninput=e=>{store.settings.fontSize=+e.target.value;document.getElementById("fsVal").textContent=e.target.value;save();applyTheme();};
-document.getElementById("notifBtn").onclick=()=>{if(window.Notification)Notification.requestPermission().then(()=>openSettings());};
-document.getElementById("appLockToggle").onclick=()=>{
-  if(store.settings.appLock){store.settings.appLock="";save();openSettings();toast("App Lock বন্ধ");}
-  else askPasscode("নতুন পাসকোড (৪-৬ সংখ্যা)",v=>{if(!/^\d{4,6}$/.test(v)){toast("৪-৬ সংখ্যা দিন");return;}store.settings.appLock=v;save();openSettings();toast("🔒 App Lock চালু");});
-};
-document.getElementById("noteLockToggle").onclick=()=>{
-  if(store.settings.noteLock){store.settings.noteLock="";store.notes.forEach(n=>n.locked=false);save();openSettings();renderEditor();renderList();toast("Note Lock বন্ধ");}
-  else askPasscode("নোট লক পাসওয়ার্ড দিন",v=>{if(!v){toast("খালি রাখা যাবে না");return;}store.settings.noteLock=v;save();openSettings();toast("📝 Note Lock চালু");},true);
-};
+document.getElementById("sBack").onclick=()=>back();
+function settingsAction(k){
+  const s=store.settings;
+  if(k==="sort")chooseSheet("Sort Notes By",[["updated","Date Edited"],["created","Date Created"],["title","Title"]],s.sortBy,v=>{s.sortBy=v;save();renderSettings();});
+  else if(k==="start")chooseSheet("Notes Start With",[["title","Title field"],["body","Body (first line = title)"]],s.notesStart,v=>{s.notesStart=v;save();renderSettings();});
+  else if(k==="theme")chooseSheet("Theme",[["dark","Dark"],["light","Light"],["auto","Auto"]],s.theme,v=>{s.theme=v;save();applyTheme();renderSettings();});
+  else if(k==="font")openFontSheet();
+  else if(k==="sync")openSyncSheet();
+  else if(k==="backup")openBackupSheet();
+  else if(k==="storage")openStorageSheet();
+  else if(k==="notif"){if(window.Notification)Notification.requestPermission().then(()=>renderSettings());}
+}
+function settingsToggle(k){
+  const s=store.settings;
+  if(k==="applock"){if(s.appLock){s.appLock="";save();renderSettings();toast("App Lock off");}else askPasscode("New passcode (4–6 digits)",v=>{if(!/^\d{4,6}$/.test(v)){toast("4–6 digits");return;}s.appLock=v;save();renderSettings();toast("🔐 App Lock on");});}
+  else if(k==="notelock"){if(s.noteLock){s.noteLock="";store.notes.forEach(n=>n.locked=false);save();renderSettings();toast("Note Lock off");}else askPasscode("Note lock password",v=>{if(!v){toast("Can't be empty");return;}s.noteLock=v;save();renderSettings();toast("🔒 Note Lock on");},true);}
+}
+function chooseSheet(title,opts,cur,cb){
+  openSheet(`<div class="grab"></div><h3>${title}</h3>`+opts.map(o=>`<div class="srow" data-v="${o[0]}">${o[1]}<span class="ck">${o[0]===cur?"✓":""}</span></div>`).join(""));
+  document.querySelectorAll("#sheet [data-v]").forEach(r=>r.onclick=()=>{closeSheet();cb(r.dataset.v);});
+}
+function openFontSheet(){
+  const s=store.settings;const fonts=[["","System"],["Georgia,'Noto Serif Bengali',serif","Serif"],["ui-monospace,Menlo,monospace","Mono"]];
+  openSheet(`<div class="grab"></div><h3>Font & Size</h3><div class="field-label">Font</div><div class="seg" id="fontSeg">${fonts.map(f=>`<button data-f="${f[0]}" class="${(s.font||"")===f[0]?"on":""}">${f[1]}</button>`).join("")}</div><div class="field-label">Text size: <span id="fsv">${s.fontSize}</span>px</div><input class="slider" type="range" min="14" max="22" value="${s.fontSize}" id="fsr"><button class="sbtn" id="fdone">Done</button>`);
+  document.querySelectorAll("#fontSeg [data-f]").forEach(b=>b.onclick=()=>{s.font=b.dataset.f;document.querySelectorAll("#fontSeg [data-f]").forEach(x=>x.classList.remove("on"));b.classList.add("on");save();applyTheme();});
+  document.getElementById("fsr").oninput=e=>{s.fontSize=+e.target.value;document.getElementById("fsv").textContent=e.target.value;save();applyTheme();};
+  document.getElementById("fdone").onclick=()=>{closeSheet();renderSettings();};
+}
+function openBackupSheet(){
+  openSheet(`<div class="grab"></div><h3>Backup & Restore</h3><div class="srow" id="bExport"><span class="ic">⬇️</span>Export backup (.json)</div><div class="srow" id="bImport"><span class="ic">⬆️</span>Import backup</div><input type="file" id="bFile" accept="application/json" hidden>`);
+  document.getElementById("bExport").onclick=()=>{closeSheet();doDownload("notenest-backup-"+new Date().toISOString().slice(0,10)+".json",JSON.stringify(store,null,2),"application/json");};
+  document.getElementById("bImport").onclick=()=>document.getElementById("bFile").click();
+  document.getElementById("bFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.notes&&d.notebooks){store=d;normalizeStore();save();closeSheet();state.activeId=null;applyTheme();showScreen("folders",false);scheduleReminders();toast("Imported");}else toast("Not a valid backup");}catch(err){toast("Could not read file");}};r.readAsText(f);};
+}
+function openStorageSheet(){
+  const sz=new Blob([JSON.stringify(store)]).size;const imgs=store.notes.reduce((a,n)=>a+(n.attachments||[]).length,0);
+  openSheet(`<div class="grab"></div><h3>Storage</h3>
+    <div class="srow"><span class="ic">📝</span>Notes<span class="ck" style="color:var(--muted)">${store.notes.filter(n=>!n.trashed).length}</span></div>
+    <div class="srow"><span class="ic">📁</span>Folders<span class="ck" style="color:var(--muted)">${store.notebooks.filter(n=>!n.special).length}</span></div>
+    <div class="srow"><span class="ic">🖼</span>Images<span class="ck" style="color:var(--muted)">${imgs}</span></div>
+    <div class="srow"><span class="ic">💾</span>Total size<span class="ck" style="color:var(--muted)">${(sz/1024/1024).toFixed(2)} MB</span></div>
+    <button class="sbtn dngr" id="emptyTrash">Empty Trash (${store.notes.filter(n=>n.trashed).length})</button>`);
+  document.getElementById("emptyTrash").onclick=()=>{store.notes=store.notes.filter(n=>!n.trashed);save();closeSheet();renderSettings();toast("Trash emptied");};
+}
 
-/* theme */
+/* ============ theme ============ */
 function applyTheme(){
   let t=store.settings.theme;
-  if(t==="auto")t=window.matchMedia&&window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";
-  document.documentElement.setAttribute("data-theme",t);
+  if(t==="auto")t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme:light)").matches)?"light":"dark";
+  document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");
   document.documentElement.style.setProperty("--ff",store.settings.font||"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Bengali',sans-serif");
   document.documentElement.style.setProperty("--fs",store.settings.fontSize+"px");
-  const n=activeNote();if(n)document.getElementById("edInner").style.background=noteBg(n);
+  document.querySelector('meta[name=theme-color]').setAttribute("content",t==="light"?"#f2f2f7":"#000000");
 }
-if(window.matchMedia)window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{if(store.settings.theme==="auto")applyTheme();});
+if(window.matchMedia)window.matchMedia("(prefers-color-scheme:light)").addEventListener("change",()=>{if(store.settings.theme==="auto")applyTheme();});
 
-/* backup / import */
-document.getElementById("exportAll").onclick=()=>doDownload("notenest-backup-"+new Date().toISOString().slice(0,10)+".json",JSON.stringify(store,null,2),"application/json");
-document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
-document.getElementById("importFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.notes&&d.notebooks)askConfirm("ব্যাকআপ ইম্পোর্ট করবেন?","বর্তমান সব নোট প্রতিস্থাপিত হবে।",()=>{store=d;load();save();state.activeId=null;applyTheme();renderAll();scheduleReminders();toast("ইম্পোর্ট সম্পন্ন");});else toast("সঠিক ব্যাকআপ ফাইল নয়");}catch(err){toast("ফাইল পড়া যায়নি");}};r.readAsText(f);e.target.value="";};
-
-/* app lock screen */
-function renderPin(){const d=document.getElementById("pinDots");d.innerHTML="";for(let i=0;i<6;i++)d.innerHTML+=`<div class="pd ${i<pinBuf.length?"on":""}"></div>`;}
+/* ============ passcode & app lock ============ */
+let pcCb=null;
+function askPasscode(title,cb,isText){
+  openSheet(`<div class="grab"></div><h3>${title}</h3><input type="${isText?"text":"password"}" inputmode="${isText?"text":"numeric"}" id="pcIn" placeholder="${isText?"Password":"Digits"}"><button class="sbtn" id="pcOk">OK</button>`);
+  pcCb=cb;setTimeout(()=>document.getElementById("pcIn").focus(),120);
+  document.getElementById("pcOk").onclick=()=>{const v=document.getElementById("pcIn").value;closeSheet();if(pcCb)pcCb(v);};
+  document.getElementById("pcIn").onkeydown=e=>{if(e.key==="Enter")document.getElementById("pcOk").click();};
+}
+let pinBuf="";
+function renderPin(){const d=document.getElementById("pinDots");let h="";for(let i=0;i<6;i++)h+=`<div class="pd ${i<pinBuf.length?"on":""}"></div>`;d.innerHTML=h;}
 function buildPad(){const pad=document.getElementById("pinPad");pad.innerHTML=["1","2","3","4","5","6","7","8","9","","0","⌫"].map(k=>k?`<button data-k="${k}">${k}</button>`:`<span></span>`).join("");
   pad.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{const k=b.dataset.k;if(k==="⌫")pinBuf=pinBuf.slice(0,-1);else if(pinBuf.length<6)pinBuf+=k;renderPin();
-    if(pinBuf.length===store.settings.appLock.length){if(pinBuf===store.settings.appLock){document.getElementById("lockScreen").classList.remove("show");pinBuf="";}else{document.getElementById("pinErr").textContent="ভুল পাসকোড";pinBuf="";setTimeout(renderPin,300);}}});}
+    if(pinBuf.length===store.settings.appLock.length){if(pinBuf===store.settings.appLock){document.getElementById("lockScreen").classList.remove("show");pinBuf="";}else{document.getElementById("pinErr").textContent="Wrong passcode";pinBuf="";setTimeout(renderPin,300);}}});}
 function maybeLock(){if(store.settings.appLock){pinBuf="";document.getElementById("pinErr").textContent="";renderPin();buildPad();document.getElementById("lockScreen").classList.add("show");}}
 
-/* mobile nav */
-document.getElementById("menuBtn").onclick=()=>{document.getElementById("sidebar").classList.add("open");document.getElementById("scrim").classList.add("show");};
-document.getElementById("scrim").onclick=()=>{document.getElementById("sidebar").classList.remove("open");document.getElementById("scrim").classList.remove("show");};
-document.getElementById("backBtn").onclick=()=>document.getElementById("editorPane").classList.remove("open");
-document.getElementById("nav").addEventListener("click",()=>{if(window.innerWidth<=900){document.getElementById("sidebar").classList.remove("open");document.getElementById("scrim").classList.remove("show");}});
+/* ============ reminders ============ */
+let rmTimers=[];
+function scheduleReminders(){rmTimers.forEach(t=>clearTimeout(t));rmTimers=[];store.notes.filter(n=>!n.trashed&&n.remindAt&&n.remindAt>Date.now()).forEach(n=>{const d=n.remindAt-Date.now();if(d<2147483647)rmTimers.push(setTimeout(()=>fireReminder(n),d));});}
+function fireReminder(n){if(window.Notification&&Notification.permission==="granted")try{new Notification("⏰ NoteNest",{body:noteTitle(n)});}catch(e){}toast("⏰ "+noteTitle(n));}
 
-document.getElementById("searchInput").addEventListener("input",e=>{state.query=e.target.value;renderList();});
-document.querySelectorAll(".sort button").forEach(b=>b.onclick=()=>{state.sort=b.dataset.sort;document.querySelectorAll(".sort button").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderList();});
-document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key==="n"){e.preventDefault();document.getElementById("newBtn").click();}if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();document.getElementById("searchInput").focus();}});
+/* ============ export (downloads capability + fallback) ============ */
+let _dl=null,_dlTried=false;
+async function ensureDl(){if(_dlTried)return _dl;_dlTried=true;try{_dl=await claude.use("downloads");}catch(e){_dl=null;}return _dl;}
+async function doDownload(name,content,type){const dl=await ensureDl();if(dl){try{await dl.save({filename:name,data:content});return;}catch(e){if(e&&e.code==="declined")return;}}try{const b=new Blob([content],{type});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}catch(e){toast("Download failed");}}
+function noteMD(n){return"# "+noteTitle(n)+"\n\n"+(n.body||"");}
+function exportNotes(notes){if(notes.length===1)doDownload((noteTitle(notes[0])||"note").replace(/[\/\\:]/g,"-")+".md",noteMD(notes[0]),"text/markdown");else doDownload("notenest-export-"+new Date().toISOString().slice(0,10)+".md",notes.map(noteMD).join("\n\n---\n\n"),"text/markdown");}
 
-/* auto-purge trash >30 days */
-function purgeTrash(){const cut=Date.now()-30*864e5;const before=store.notes.length;store.notes=store.notes.filter(n=>!(n.trashed&&n.deletedAt&&n.deletedAt<cut));if(store.notes.length!==before)save();}
-
-/* ---------- Google Drive sync ---------- */
+/* ============ Google Drive sync ============ */
 const drive={token:null,exp:0,fileId:null,connected:false,busy:false};
-const DRIVE_SCOPE="https://www.googleapis.com/auth/drive.appdata";
-const DRIVE_FILE="notenest-sync.json";
+const DRIVE_SCOPE="https://www.googleapis.com/auth/drive.appdata",DRIVE_FILE="notenest-sync.json";
 let pushTimer=null;
 function schedulePush(){if(!drive.connected)return;clearTimeout(pushTimer);pushTimer=setTimeout(()=>drivePush(),5000);}
 function driveFetch(url,opt){opt=opt||{};opt.headers=Object.assign({Authorization:"Bearer "+drive.token},opt.headers||{});return fetch(url,opt);}
 function driveReady(){return window.google&&google.accounts&&google.accounts.oauth2;}
-function driveAuth(interactive){
-  return new Promise(res=>{
-    if(!store.settings.driveClientId){toast("আগে Client ID দিন");return res(null);}
-    if(!driveReady()){toast("Google এখনো লোড হয়নি, একটু পর চেষ্টা করুন");return res(null);}
-    if(drive.token&&drive.exp>Date.now()+60000)return res(drive.token);
-    try{
-      const tc=google.accounts.oauth2.initTokenClient({
-        client_id:store.settings.driveClientId,scope:DRIVE_SCOPE,
-        callback:r=>{if(r&&r.access_token){drive.token=r.access_token;drive.exp=Date.now()+((r.expires_in||3600)*1000);drive.connected=true;res(r.access_token);}else res(null);},
-        error_callback:()=>res(null)
-      });
-      tc.requestAccessToken({prompt:interactive?"consent":""});
-    }catch(e){res(null);}
-  });
-}
-function mergeStores(remote){
-  const map={};store.notes.forEach(n=>map[n.id]=n);
-  (remote.notes||[]).forEach(rn=>{const ln=map[rn.id];if(!ln||(rn.updated||0)>(ln.updated||0))map[rn.id]=rn;});
-  store.notes=Object.values(map);
-  const nb={};(remote.notebooks||[]).forEach(x=>nb[x.id]=x);store.notebooks.forEach(x=>nb[x.id]=x);
-  store.notebooks=Object.values(nb);
-  normalizeStore();
-}
+function driveAuth(interactive){return new Promise(res=>{
+  if(!store.settings.driveClientId){toast("Enter Client ID first");return res(null);}
+  if(!driveReady()){toast("Google not loaded yet, try again");return res(null);}
+  if(drive.token&&drive.exp>Date.now()+60000)return res(drive.token);
+  try{const tc=google.accounts.oauth2.initTokenClient({client_id:store.settings.driveClientId,scope:DRIVE_SCOPE,callback:r=>{if(r&&r.access_token){drive.token=r.access_token;drive.exp=Date.now()+((r.expires_in||3600)*1000);drive.connected=true;res(r.access_token);}else res(null);},error_callback:()=>res(null)});tc.requestAccessToken({prompt:interactive?"consent":""});}catch(e){res(null);}
+});}
+function mergeStores(remote){const map={};store.notes.forEach(n=>map[n.id]=n);(remote.notes||[]).forEach(rn=>{const ln=map[rn.id];if(!ln||(rn.updated||0)>(ln.updated||0))map[rn.id]=rn;});store.notes=Object.values(map);const nb={};(remote.notebooks||[]).forEach(x=>nb[x.id]=x);store.notebooks.forEach(x=>nb[x.id]=x);store.notebooks=Object.values(nb);normalizeStore();}
 async function driveSync(interactive){
-  if(drive.busy)return;
-  const tok=await driveAuth(interactive!==false);
-  if(!tok){updateDriveStatus();return;}
-  drive.busy=true;updateDriveStatus("🔄 সিঙ্ক হচ্ছে...");
+  if(drive.busy)return;const tok=await driveAuth(interactive!==false);if(!tok){updateDriveStatus();return;}
+  drive.busy=true;updateDriveStatus("Syncing…");
   try{
-    if(!drive.fileId){
-      const r=await driveFetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q="+encodeURIComponent("name='"+DRIVE_FILE+"'")+"&fields=files(id)");
-      const j=await r.json();if(j.files&&j.files.length)drive.fileId=j.files[0].id;
-    }
-    if(drive.fileId){
-      const r=await driveFetch("https://www.googleapis.com/drive/v3/files/"+drive.fileId+"?alt=media");
-      if(r.ok){const remote=await r.json();if(remote&&remote.notes)mergeStores(remote);}
-    }
+    if(!drive.fileId){const r=await driveFetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q="+encodeURIComponent("name='"+DRIVE_FILE+"'")+"&fields=files(id)");const j=await r.json();if(j.files&&j.files.length)drive.fileId=j.files[0].id;}
+    if(drive.fileId){const r=await driveFetch("https://www.googleapis.com/drive/v3/files/"+drive.fileId+"?alt=media");if(r.ok){const rem=await r.json();if(rem&&rem.notes)mergeStores(rem);}}
     normalizeStore();save();
     const body=JSON.stringify(store);
-    if(drive.fileId){
-      await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+drive.fileId+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body});
-    }else{
-      const b="nnsync"+Date.now();const meta={name:DRIVE_FILE,parents:["appDataFolder"]};
-      const mb="--"+b+"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"+JSON.stringify(meta)+"\r\n--"+b+"\r\nContent-Type: application/json\r\n\r\n"+body+"\r\n--"+b+"--";
-      const r=await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+b},body:mb});
-      const j=await r.json();drive.fileId=j.id;
-    }
-    store.settings.lastSync=Date.now();save();drive.connected=true;
-    state.unlocked.clear();renderAll();updateDriveStatus();if(interactive!==false)toast("☁ সিঙ্ক সম্পন্ন");
-  }catch(e){updateDriveStatus();toast("সিঙ্ক ব্যর্থ — আবার চেষ্টা করুন");}
+    if(drive.fileId){await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+drive.fileId+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body});}
+    else{const b="nn"+Date.now();const meta={name:DRIVE_FILE,parents:["appDataFolder"]};const mb="--"+b+"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"+JSON.stringify(meta)+"\r\n--"+b+"\r\nContent-Type: application/json\r\n\r\n"+body+"\r\n--"+b+"--";const r=await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+b},body:mb});const j=await r.json();drive.fileId=j.id;}
+    store.settings.lastSync=Date.now();save();drive.connected=true;state.unlocked.clear();
+    if(state.screen==="folders")renderFolders();else if(state.screen==="list")renderList();else if(state.screen==="settings")renderSettings();
+    updateDriveStatus();if(interactive!==false)toast("☁ Synced");
+  }catch(e){updateDriveStatus();toast("Sync failed");}
   drive.busy=false;
 }
-async function drivePush(){
-  if(!drive.connected||drive.busy||!drive.fileId)return;
-  const tok=await driveAuth(false);if(!tok)return;
-  try{await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+drive.fileId+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(store)});store.settings.lastSync=Date.now();updateDriveStatus();}catch(e){}
+async function drivePush(){if(!drive.connected||drive.busy||!drive.fileId)return;const tok=await driveAuth(false);if(!tok)return;try{await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+drive.fileId+"?uploadType=media",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(store)});store.settings.lastSync=Date.now();updateDriveStatus();}catch(e){}}
+function updateDriveStatus(txt){const s=document.getElementById("dvStatus");if(!s)return;if(txt){s.textContent=txt;return;}s.textContent=drive.connected?("Connected"+(store.settings.lastSync?" · last sync "+fmtDT(store.settings.lastSync):"")):"Not connected";const btn=document.getElementById("dvBtn");if(btn)btn.textContent=drive.connected?"Disconnect":"Connect";}
+function openSyncSheet(){
+  openSheet(`<div class="grab"></div><h3>Google Drive Sync</h3>
+    <div class="field-label">OAuth Client ID</div><input type="text" id="dvCid" placeholder="…apps.googleusercontent.com" value="${esc(store.settings.driveClientId||"")}">
+    <div style="padding:4px 22px 6px;font-size:13.5px;color:var(--muted)" id="dvStatus"></div>
+    <button class="sbtn" id="dvBtn">Connect</button>
+    <button class="sbtn sec" id="dvSync">🔄 Sync now</button>`);
+  updateDriveStatus();
+  document.getElementById("dvCid").onchange=e=>{store.settings.driveClientId=e.target.value.trim();save();};
+  document.getElementById("dvBtn").onclick=async()=>{if(drive.connected){drive.connected=false;drive.token=null;drive.exp=0;updateDriveStatus();renderSettings();toast("Disconnected");return;}const cid=document.getElementById("dvCid").value.trim();if(cid){store.settings.driveClientId=cid;save();}await driveSync(true);updateDriveStatus();renderSettings();};
+  document.getElementById("dvSync").onclick=()=>driveSync(true);
 }
-function updateDriveStatus(txt){
-  const s=document.getElementById("driveStatus"),sub=document.getElementById("driveSub"),btn=document.getElementById("driveBtn");
-  if(!s)return;
-  if(txt){s.textContent=txt;return;}
-  if(drive.connected){s.textContent="✓ সংযুক্ত";sub.textContent=store.settings.lastSync?("শেষ সিঙ্ক: "+fmtDT(store.settings.lastSync)):"সিঙ্ক চলছে";btn.textContent="Disconnect";}
-  else{s.textContent="সংযুক্ত নয়";sub.textContent="সব ডিভাইসে নোট সিঙ্ক করুন";btn.textContent="Connect";}
-}
-document.getElementById("driveCid").onchange=e=>{store.settings.driveClientId=e.target.value.trim();save();};
-document.getElementById("driveBtn").onclick=async()=>{
-  if(drive.connected){drive.connected=false;drive.token=null;drive.exp=0;updateDriveStatus();toast("সংযোগ বিচ্ছিন্ন");return;}
-  const cid=document.getElementById("driveCid").value.trim();if(cid){store.settings.driveClientId=cid;save();}
-  await driveSync(true);
-};
-document.getElementById("syncNow").onclick=()=>driveSync(true);
 function driveBootstrap(){let t=0;const iv=setInterval(()=>{if(driveReady()){clearInterval(iv);driveSync(false);}else if(++t>24)clearInterval(iv);},500);}
 
-function renderAll(){renderNav();renderList();renderEditor();}
-load();purgeTrash();applyTheme();renderAll();scheduleReminders();maybeLock();
-if(store.settings.driveClientId)driveBootstrap();
+/* ============ init ============ */
+(async function(){
+  await load();
+  applyTheme();
+  showScreen("folders",false);
+  scheduleReminders();maybeLock();
+  if(store.settings.driveClientId)driveBootstrap();
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
 </script>
 </body>
 </html>
